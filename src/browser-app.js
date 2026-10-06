@@ -1,19 +1,47 @@
-import { createClient } from '@supabase/supabase-js';
-import { supabaseUrl, publishableKey } from './browser-config.js';
-
-const auth = createClient(supabaseUrl, publishableKey);
 const $ = id => document.getElementById(id);
+const sessionKey = 'byteback-session-v5';
 let session = null;
+let refreshInFlight = null;
 let revision = 0;
 let listRevision = 0;
 let editing = null;
 const showError = text => { $('status').textContent = text; };
-const loginError = error => ({
-  invalid_credentials: '이메일 또는 비밀번호가 올바르지 않습니다.',
-  email_not_confirmed: '이메일 인증을 완료한 뒤 로그인해 주세요.',
-  over_request_rate_limit: '요청이 많습니다. 잠시 후 다시 시도해 주세요.',
-  user_banned: '이 계정은 현재 로그인할 수 없습니다.',
-}[error?.code] ?? '로그인하지 못했습니다. 계정 정보와 인터넷 연결을 확인해 주세요.');
+// Remove only this project's old SDK session from earlier stages.
+try { localStorage.removeItem('sb-fgluruiqasiexuqjvzhq-auth-token'); } catch {}
+
+function saveSession(next) {
+  session = next;
+  try {
+    if (next) sessionStorage.setItem(sessionKey, JSON.stringify(next));
+    else sessionStorage.removeItem(sessionKey);
+  } catch { /* In-memory login still works if storage is unavailable. */ }
+}
+
+async function authRequest(body, accessToken) {
+  const response = await fetch('/api/auth', { method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error ?? '로그인 요청을 처리하지 못했습니다.');
+  return result;
+}
+
+async function activeSession(force = false) {
+  if (!session) throw new Error('로그인이 필요합니다.');
+  if (!force && session.expires_at > Date.now() / 1000 + 60) return session;
+  if (!refreshInFlight) {
+    const previous = session;
+    refreshInFlight = authRequest({ action: 'refresh', refresh_token: previous.refresh_token })
+      .then(result => {
+        if (session !== previous) throw new Error('로그인 상태가 변경되었습니다.');
+        if (result.session?.user.id !== previous.user.id) throw new Error('다시 로그인해 주세요.');
+        saveSession(result.session);
+        return session;
+      }).finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
 
 function resetEditor() {
   editing = null;
@@ -24,7 +52,7 @@ function resetEditor() {
 
 function setSession(next) {
   const changedUser = session?.user.id !== next?.user.id;
-  session = next;
+  saveSession(next);
   revision++;
   $('login-panel').hidden = !!next;
   $('workspace').hidden = !next;
@@ -35,11 +63,17 @@ function setSession(next) {
 }
 
 async function api(path, options = {}) {
-  const active = session;
-  if (!active) throw new Error('로그인이 필요합니다.');
-  const response = await fetch(path, { ...options, cache: 'no-store', headers: {
-    'Content-Type': 'application/json', Authorization: `Bearer ${active.access_token}`,
+  let active;
+  try { active = await activeSession(); }
+  catch (error) { setSession(null); showError(error.message); throw error; }
+  const send = current => fetch(path, { ...options, cache: 'no-store', headers: {
+    'Content-Type': 'application/json', Authorization: `Bearer ${current.access_token}`,
   } });
+  let response = await send(active);
+  if (response.status === 401 && session === active) {
+    try { active = await activeSession(true); response = await send(active); }
+    catch (error) { setSession(null); showError(error.message); throw error; }
+  }
   const result = await response.json().catch(() => null);
   if (response.status === 401 && session === active) {
     setSession(null);
@@ -103,20 +137,21 @@ $('login-form').addEventListener('submit', async event => {
   $('login').disabled = true;
   showError('로그인 중입니다.');
   try {
-    const { error } = await auth.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+    const result = await authRequest({ action: 'login', email: $('email').value.trim(), password: $('password').value });
     $('password').value = '';
-    showError(error ? loginError(error) : '로그인했습니다.');
-  } catch { showError('로그인 서버에 연결하지 못했습니다.'); }
+    setSession(result.session);
+    showError('로그인했습니다.');
+  } catch (error) { showError(error.message); }
   finally { $('password').value = ''; $('login').disabled = false; }
 });
 $('logout').addEventListener('click', async () => {
   $('logout').disabled = true;
   try {
-    const { error } = await auth.auth.signOut({ scope: 'local' });
-    if (error) throw error;
+    const previous = session;
     setSession(null);
+    if (previous) await authRequest({ action: 'logout' }, previous.access_token);
     showError('로그아웃했습니다.');
-  } catch { showError('로그아웃하지 못했습니다. 다시 시도해 주세요.'); }
+  } catch { showError('이 브라우저에서 로그아웃했습니다. 서버 세션 종료는 확인하지 못했습니다.'); }
   finally { $('logout').disabled = false; }
 });
 $('note-form').addEventListener('submit', async event => {
@@ -135,7 +170,8 @@ $('note-form').addEventListener('submit', async event => {
   finally { $('save').disabled = false; }
 });
 $('cancel').addEventListener('click', resetEditor);
-auth.auth.onAuthStateChange((_event, next) => {
-  // Keep SDK calls outside its auth event lock.
-  setTimeout(() => setSession(next), 0);
-});
+try {
+  const saved = JSON.parse(sessionStorage.getItem(sessionKey) ?? 'null');
+  if (saved && typeof saved.access_token === 'string' && typeof saved.refresh_token === 'string'
+      && Number.isSafeInteger(saved.expires_at) && typeof saved.user?.id === 'string') setSession(saved);
+} catch { saveSession(null); }

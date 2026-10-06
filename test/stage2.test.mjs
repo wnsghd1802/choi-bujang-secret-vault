@@ -17,6 +17,8 @@ test('deployment metadata records the current stage', async () => {
   const config = JSON.parse(await readFile(new URL('../aleph.config.json', import.meta.url), 'utf8'));
   const identity = deploymentIdentity({ VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'wnsghd1802',
     VERCEL_GIT_REPO_SLUG: 'choi-bujang-secret-vault', VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40), VERCEL_URL: 'test.vercel.app' }, config);
-  assert.equal(identity.step, 4);
+  assert.equal(identity.step, 5);
+  assert.deepEqual(identity.allowedRoutes, config.allowedRoutes);
+  assert.equal(identity.originalApiUrl, config.originalApiUrl);
   assert.equal(identity.repoUrl, config.repoUrl);
 });

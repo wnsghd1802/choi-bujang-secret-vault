@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if ([3, 4].includes(config.step)) return runStageThreeChecks(config);
+  if ([3, 4, 5].includes(config.step)) return runStageThreeChecks(config);
   if (config.step === 2) return runStageTwoChecks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
@@ -70,6 +70,29 @@ async function runStageThreeChecks(config) {
   const root = await get('/');
   results.push({ attackId: 'security_header', expected: '첫 화면 정상 응답과 nosniff',
     observed: root.ok && root.headers.get('x-content-type-options') === 'nosniff' ? '정상 응답과 nosniff 확인' : '응답 또는 헤더 확인 실패' });
+  if (config.step >= 5) {
+    const script = await get('/app.js');
+    const html = await root.text();
+    const code = await script.text();
+    const leakedKey = /sb_(?:publishable|secret)_[A-Za-z0-9_-]{12,}|eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/u.test(html + code);
+    results.push({ attackId: 'browser_key_scan', expected: '첫 화면과 실제 브라우저 번들에 Supabase 키 없음',
+      observed: root.ok && script.ok && !leakedKey ? '화면과 번들에서 키 패턴 미발견' : '화면 또는 번들 검사 실패' });
+    results.push({ attackId: 'allowed_routes', expected: '배포 메타데이터에 허용 경로 기록',
+      observed: Array.isArray(identity?.allowedRoutes) && identity.allowedRoutes.length > 0 ? '허용 경로 기록 확인' : '허용 경로 누락' });
+    // This optional public key is for direct-origin checks only; never include its value in reports.
+    if (process.env.SUPABASE_PUBLISHABLE_KEY) {
+      const origin = new URL(config.originalApiUrl);
+      const issuer = new URL(config.identityProvider.issuer);
+      if (origin.origin !== issuer.origin || origin.pathname !== '/rest/v1/notes' || origin.search || origin.hash) throw new Error('원본 자료 주소를 확인해 주세요.');
+      const direct = await fetch(origin, { headers: { apikey: process.env.SUPABASE_PUBLISHABLE_KEY },
+        redirect: 'error', signal: AbortSignal.timeout(10000) });
+      const denied = [401, 403].includes(direct.status);
+      results.push({ attackId: 'direct_origin_read', expected: '공개 키로 원본 자료 읽기 거부',
+        observed: denied ? `직접 조회 거부 (HTTP ${direct.status})` : `직접 조회 차단 확인 실패 (HTTP ${direct.status})` });
+    } else {
+      results.push({ attackId: 'direct_origin_read', expected: '공개 키로 원본 자료 읽기 거부', observed: '미실행: 검사 환경에 공개 키가 없어 별도 확인 필요' });
+    }
+  }
   return results;
 }
 

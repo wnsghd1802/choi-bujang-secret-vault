@@ -1,32 +1,30 @@
-# BYTE BACK 방어전 — 4단계: 로그인해도 내 자료만
+# BYTE BACK 방어전 — 5단계: 자료 요청을 서버 한곳으로
 
 ## 현재 기능
 
-- Supabase 이메일·비밀번호 로그인/로그아웃과 원본 `src/verify-login.mjs`를 유지합니다.
-- 메모 목록·단건 조회·수정·삭제는 모두 서버에서 검증한 사용자 ID와 `owner_id`가 같은 행만 다룹니다.
-- 단건 GET·PUT·DELETE의 ID 조건과 소유자 조건을 같은 DB 쿼리에 넣습니다. 타인 자료와 없는 자료는 동일한 JSON 404를 반환합니다.
-- 추가 시 소유자는 검증된 ID로 강제 지정합니다. 수정은 제목·본문만 갱신하고 소유자는 유지합니다. 다른 `owner_id`로 바꾸는 PUT은 403으로 거부합니다.
-- 응답·입력 규격은 유지합니다. POST `{id?,title,body}`, PUT `{title,body}`, 단건 응답 `{id,title,body}`, 목록은 본인 메모 배열, 삭제 응답 `{id,deleted:true}`.
-- 토큰이 없거나 유효하지 않으면 자료 없이 JSON 401. 보안 헤더와 빈 공개 JSON을 유지합니다.
+- 브라우저의 메모 직접 Supabase 호출은 없음: 기존 `/api/notes` 경로를 유지합니다.
+- 메모 읽기·추가·수정·삭제는 서버가 로그인 토큰과 소유자를 확인한 뒤 처리합니다. 원본 `src/verify-login.mjs`는 변경하지 않았습니다.
+- 추가 점수 항목을 위해 로그인·갱신·로그아웃도 `/api/auth`에서 공식 Supabase SDK로 처리합니다. 브라우저 번들에 Supabase 공개 키나 서버 키를 포함하지 않습니다.
+- 로그인 응답은 해당 사용자 세션에 필요한 토큰·만료 시각·사용자 ID만 포함합니다. 서버는 요청마다 새 SDK 클라이언트를 사용하며 비밀번호·토큰을 로그에 남기지 않습니다.
+- 브라우저 세션은 sessionStorage에 보관합니다. 업그레이드 후 다시 로그인하세요. 메모 응답 규격과 A/B 소유권 검사는 4단계와 같습니다.
 
-## DB 적용 순서
+## DB 적용
 
-1. 공식 Authentication 화면에서 A·B 두 계정을 준비합니다. 비밀번호는 공유하지 않습니다.
-2. 공개 저장소 밖의 시험 자료 SQL에서 A·B 이메일을 직접 입력합니다. auth.users에서 ID를 찾아 기존 가상 자료 네 건을 A에 연결하고 B 시험 메모 한 건을 준비합니다. 이메일이나 메모 본문을 포함한 파일은 GitHub에 올리지 않습니다.
-3. SQL Editor에서 `migrations/004-owner-rls.sql`을 실행합니다. 이 파일은 public.notes만 변경합니다.
+기존 4단계 DB에서 `migrations/005-server-only.sql`을 실행합니다. public.notes의 PUBLIC·anon·authenticated 테이블 및 열 권한만 회수합니다. RLS와 기존 네 소유자 정책, 서버 권한, 데이터 및 다른 테이블은 유지합니다.
 
-DB 정책은 PUBLIC·anon·authenticated의 기존 테이블/열 권한을 회수하고, authenticated에 SELECT·INSERT·UPDATE·DELETE만 허용합니다.
-SELECT·DELETE는 기존 행 USING, INSERT는 새 행 WITH CHECK, UPDATE는 USING과 WITH CHECK 모두 `(select auth.uid()) = owner_id`를 검사합니다.
-동일 테이블의 오래된 정책을 교체하여 permissive 정책이 합쳐져 제한을 우회하지 않게 합니다. 다른 테이블은 변경하지 않습니다.
-SQL의 실행 전후 결과로 information_schema.role_table_grants와 has_table_privilege를 대조합니다. 최종 결과는 anon 4개 권한 false, authenticated 4개 true, RLS true, 정책 4개입니다. authenticated의 true는 모든 행 접근이 아니라 RLS가 허용하는 자기 행의 작업 권한입니다.
+실행 전후 information_schema.role_table_grants와 has_table_privilege 결과를 비교합니다. 최종 결과:
 
-서버 전용 service_role은 RLS를 우회하므로 서버의 소유자 검사도 반드시 유지합니다. 심판 시험 계정은 Supabase auth.users 외래키 없이 원본 검증 도우미로 인증한 ID를 사용합니다.
-기존 `migrations/003-auth-notes.sql`은 이전 단계 기록입니다. 4단계 정책 적용 후 다시 실행하지 않습니다.
+| 역할 | SELECT / INSERT / UPDATE / DELETE | RLS |
+|---|---|---|
+| anon | 모두 false | true |
+| authenticated | 모두 false | true |
+| service_role | 모두 true | true |
 
-## 설정·빌드
+로그인한 사용자도 Supabase Data API로 메모에 직접 접근하지 못합니다. 서버 전용 역할은 RLS를 우회하므로 서버의 로그인·소유자 검사가 계속 필요합니다. 이전 단계의 권한 SQL을 다시 실행하면 직접 접근 권한이 열릴 수 있으므로 재실행하지 않습니다.
 
-기존 Vercel `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 유지합니다. 공개 URL과 publishable key는 `src/browser-config.js`에 있습니다.
-`aleph.config.json`에는 단계 4, 실제 발급자, 실제 GET·POST·PUT·DELETE 경로가 기록되어 있습니다. `judgeIssuer`와 로그인 검증 도우미는 원본을 유지합니다.
+## 설정과 빌드
+
+기존 Vercel 환경변수 SUPABASE_URL, SUPABASE_SECRET_KEY를 그대로 사용합니다. 새 환경변수는 필요하지 않습니다. 키를 소스나 공개 파일에 넣지 않습니다.
 
 ```sh
 npm ci
@@ -34,25 +32,24 @@ node --test test/*.test.mjs
 npm run build -- --local
 ```
 
-실제 배포 빌드는 `/aleph.json`에 해당 GitHub 커밋과 단계 4를 기록하고, 화면용 SDK 번들을 생성하며, 공개 `data.json`을 빈 목록으로 유지합니다.
+aleph.config.json은 단계 5와 실제 메모 API의 allowedRoutes를 기록합니다. originalApiUrl은 쿼리 없는 `https://fgluruiqasiexuqjvzhq.supabase.co/rest/v1/notes`입니다. 배포 시 생성하는 /aleph.json에도 단계·커밋·allowedRoutes·originalApiUrl을 기록합니다. 공개 data.json은 빈 목록이며 첫 화면에 nosniff 헤더를 유지합니다.
 
 ## 검증과 남은 한계
 
-API 단위 테스트는 A·B 각각 정상 CRUD, 상대 ID 직접 조회·수정·삭제 거부, 소유자 변경 거부, 타인 메모 내용·존재 정보 비노출, 위조·만료·다른 서비스용 토큰 거부를 확인합니다.
-임시 PostgreSQL 환경에서는 동일 정책 SQL의 A/B 행 접근·쓰기 제한, 익명 거부, 소유권 이전 거부, 기존 데이터와 다른 테이블 보존, SQL 재실행을 확인했습니다. 이것은 실제 Supabase 적용 결과나 운영 심판 판정이 아닙니다.
+로컬 API/인증 테스트 15개와 빌드가 통과했습니다. 인증 테스트는 실제 SDK에 모의 응답을 연결하여 로그인·갱신·로그아웃 요청, 세션 응답 최소화, 오류 처리 및 키 비노출을 확인합니다. 실제 계정 로그인 성공을 대신하지 않습니다.
 
-배포 후 확인:
-- A·B는 각자 자기 메모만 보고 추가·수정·삭제할 수 있어야 합니다.
-- 상대 ID를 직접 지정한 GET·PUT·DELETE는 404, 소유자 이전 PUT은 403이어야 합니다.
-- 비로그인 요청은 JSON 401, 공개 자료는 0건, nosniff 헤더가 있어야 합니다.
-- 공개 키만 사용한 Supabase Data API 접근은 거부되어야 합니다. authenticated 직접 DB 접근은 로컬 정책 시험과 구분해 기록하며 심판 재현 가능 범위를 과장하지 않습니다.
-- `/aleph.json`의 단계·커밋을 GitHub와 비교합니다.
+임시 PostgreSQL 환경에서 기존 4단계 검사 23개와 추가 5단계 검사 15개가 통과했습니다. anon/authenticated 직접 CRUD 거부, service_role CRUD 유지, 데이터·네 정책·다른 테이블 보존 및 SQL 재실행을 확인했습니다. 실제 Supabase 적용 여부는 사용자의 실행 결과로 별도 확인합니다.
 
-과거 공개 커밋·옛 배포는 여전히 남습니다. 이전 배포 주소가 자동으로 보호된다고 주장하지 않습니다. 로그아웃한 액세스 토큰도 만료 전까지 유효할 수 있으며 즉시 회수는 구현하지 않았습니다.
+배포 후 확인할 항목:
+- A와 B 각각 자신의 메모만 보고 추가·수정·삭제·로그아웃할 수 있는지.
+- 비로그인 메모 요청이 JSON 401이고 타인 ID 접근이 거부되는지.
+- 공개 키 및 로그인 토큰으로 원본 Data API에 직접 접근해도 자료가 반환되지 않는지.
+- 화면 번들에 공개/서버 키가 없고, /aleph.json 경로 정보와 보안 헤더가 유지되는지.
+
+과거 커밋과 옛 배포에 남은 공개 기록을 삭제한 것은 아닙니다. 공개 키를 화면에서 제거하는 것만으로 권한이 보호되는 것도 아닙니다. 실제 직접 접근 차단은 DB 권한 회수로 보장합니다. 로그아웃해도 이미 발급된 액세스 토큰은 만료 전까지 유효할 수 있습니다. 브라우저 세션 토큰은 JavaScript가 접근할 수 있으므로 XSS 방어도 계속 필요합니다.
 
 ## 저장점과 제출
 
-변경을 `4단계 저장점`으로 커밋·배포한 뒤 검사합니다. 비밀값과 메모 본문은 포함하지 않습니다.
-제외 처리된 `bundle-notes.json`에 실제 확인 및 미확인 결과를 기록하고 `npm run bundle`로 배포 자기 점검을 실행합니다.
-이 점검은 비로그인 거부와 공개 자료·메타데이터·헤더를 확인합니다. A/B 교차 접근 검사를 수행하지 않았으면 수행했다고 적지 않습니다.
-정상 사용자 시험은 사용자 확인, 로컬 합성 시험은 로컬 결과, 실제 배포 HTTP 검사는 실제 결과로 구분합니다. 제출 묶음과 bundle-notes.json은 커밋하지 않습니다.
+변경을 `5단계 저장점`으로 커밋·배포한 뒤 확인합니다. 제외된 bundle-notes.json에 실제 확인과 미확인 사항을 구분해 적고 npm run bundle을 실행합니다. 제출 묶음은 커밋하지 않습니다.
+
+자동 점검은 익명 거부·공개 자료·메타데이터·헤더·브라우저 키 비노출을 검사합니다. 원본 직접 읽기 검사는 로컬 SUPABASE_PUBLISHABLE_KEY가 있을 때만 실행하고 없으면 미실행으로 기록합니다. 실제 A/B 로그인 및 교차 접근 검사를 수행하지 않았으면 수행했다고 기록하지 않습니다.
