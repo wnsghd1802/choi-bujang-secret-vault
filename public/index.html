@@ -3,50 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BYTE BACK | 실습 자료실</title>
+  <title>BYTE BACK | 로그인 자료실</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body { margin: 0; min-height: 100vh; background: #101a28; color: #ecf4ff; }
-    main { max-width: 760px; margin: 0 auto; padding: 44px 22px 64px; }
-    .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
-    h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
-    p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
-    .notice { margin: 26px 0; padding: 18px; border: 1px solid #d07384; border-radius: 14px; color: #ffe3e8; background: #612a3544; }
-    ul { list-style: none; display: grid; gap: 12px; padding: 0; }
-    li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
-    strong { display: block; font-size: 18px; margin-bottom: 5px; }
-    li span { color: #bfd0e5; }
+    main { max-width: 760px; margin: auto; padding: 36px 20px 60px; }
+    .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; }
+    h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 44px); }
+    h2 { font-size: 22px; }
+    h3 { margin: 0 0 10px; overflow-wrap: anywhere; }
+    p { line-height: 1.7; color: #bfd0e5; overflow-wrap: anywhere; }
+    .panel, li { border: 1px solid #51667c; padding: 20px; border-radius: 14px; background: #1a2a3d; margin: 18px 0; }
+    label { display: block; margin: 14px 0 6px; }
+    input, textarea { width: 100%; padding: 12px; border: 1px solid #728399; border-radius: 8px; background: #101a28; color: inherit; font: inherit; }
+    textarea { min-height: 120px; resize: vertical; }
+    button { padding: 11px 16px; margin-top: 14px; border: 1px solid #8ad8df; border-radius: 8px; background: #8ad8df; color: #101a28; font: inherit; font-weight: 650; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #faf0ac; outline-offset: 3px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    ul { list-style: none; padding: 0; }
+    #status { min-height: 1.5em; color: #faf0ac; }
+    #account { color: #8ad8df; }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 2단계 자료 이동</div>
+    <div class="eyebrow">BYTE BACK · 3단계 로그인</div>
     <h1>실습 자료실</h1>
-    <p>아래 기록은 모두 실습을 위해 만든 가상 자료입니다.</p>
-    <div class="notice">아직 로그인 없이 자료를 볼 수 있습니다. 실제 개인정보는 넣지 마세요.</div>
-    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+    <p>로그인한 뒤 가상 메모를 작성할 수 있습니다. 실제 개인정보는 넣지 마세요.</p>
+    <div class="actions"><span id="account">로그인되지 않음</span><button id="logout" hidden>로그아웃</button></div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="login-panel" class="panel" aria-labelledby="login-heading">
+      <h2 id="login-heading">로그인</h2>
+      <form id="login-form">
+        <label for="email">이메일</label><input id="email" type="email" autocomplete="username" required>
+        <label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password" required>
+        <button id="login" type="submit">로그인</button>
+      </form>
+    </section>
+    <section id="workspace" hidden aria-label="내 메모">
+      <form id="note-form" class="panel">
+        <h2>메모 작성</h2>
+        <label for="title">제목</label><input id="title" maxlength="120" required>
+        <label for="body">내용</label><textarea id="body" maxlength="10000"></textarea>
+        <div class="actions"><button id="save" type="submit">메모 추가</button><button id="cancel" type="button" hidden>수정 취소</button></div>
+      </form>
+      <h2>내 메모</h2><p id="empty" hidden>아직 작성한 메모가 없습니다. 첫 메모를 추가해 보세요.</p>
+      <ul id="notes" aria-live="polite"></ul>
+    </section>
+    <noscript>로그인하려면 브라우저에서 JavaScript를 활성화해 주세요.</noscript>
   </main>
-  <script type="module">
-    const list = document.querySelector('#notes');
-    try {
-      const response = await fetch('/api/notes', { cache: 'no-store' });
-      if (!response.ok) throw new Error('자료를 불러오지 못했습니다. 서버 연결 설정을 확인해 주세요.');
-      const data = await response.json();
-      if (!Array.isArray(data.notes)) throw new Error('자료 형식이 맞지 않습니다.');
-      list.replaceChildren(...data.notes.map(note => {
-        const item = document.createElement('li');
-        const title = document.createElement('strong');
-        const content = document.createElement('span');
-        title.textContent = note.title;
-        content.textContent = note.content;
-        item.append(title, content);
-        return item;
-      }));
-    } catch (error) {
-      const item = document.createElement('li');
-      item.textContent = error.message;
-      list.replaceChildren(item);
-    }
-  </script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

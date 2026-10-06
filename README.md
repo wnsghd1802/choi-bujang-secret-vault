@@ -1,31 +1,39 @@
-# BYTE BACK 방어전 — 2단계
+# BYTE BACK 방어전 — 3단계: 진짜 로그인
 
-## 현재 기능과 남은 한계
+## 현재 기능
 
-- 화면은 Vercel 서버 함수 `GET /api/notes`에서 가상 자료를 받아 표시합니다.
-- 메모는 Supabase `public.notes`에만 보관합니다. 저장소의 `data.json`과 `public/data.json`은 빈 목록입니다.
-- `owner_id uuid` 칸은 준비되어 있으나 아직 사용자 연결이나 로그인은 구현하지 않았습니다.
-- DB 테이블은 RLS를 켜고 `anon`과 `authenticated`의 직접 읽기 권한을 제거합니다. 서버 역할만 읽습니다.
-- **서버 API는 아직 공개되어 있습니다.** 누구나 `/api/notes`로 가상 자료를 읽을 수 있습니다. 인증은 3단계 작업이며 실제 개인정보를 넣으면 안 됩니다.
-- 이전 공개 커밋과 이전 배포에는 옛 자료가 남습니다. 현재 파일에서 제거해도 과거 공개 이력은 삭제되지 않습니다. 과거 노출을 해결했다고 주장하지 않습니다.
+- Supabase 공식 SDK의 이메일·비밀번호 로그인과 로그아웃을 사용합니다. 브라우저에는 공개 URL과 publishable key만 포함합니다.
+- 서버는 원본 `src/verify-login.mjs`로 토큰을 검증합니다. 이 도우미는 수정하지 않았습니다. 사용자 ID나 역할을 브라우저 입력으로 신뢰하지 않습니다.
+- `/api/notes`의 GET은 로그인 사용자의 메모 배열, POST는 `{id?,title,body}`를 받아 `{id,title,body}`를 반환합니다. ID를 생략하면 서버가 UUID를 만듭니다.
+- `/api/notes/:id`의 GET·PUT·DELETE는 토큰이 필요합니다. PUT 입력은 `{title,body}`, 단건 응답은 `{id,title,body}`, 삭제 응답은 `{id,deleted:true}`입니다. 없는 메모는 404입니다.
+- POST의 `owner_id`는 검증된 로그인 사용자 ID로 저장합니다. 브라우저가 보낸 `owner_id`, `userId`, `role`은 무시합니다.
+- 메모 본문은 DB의 `content` 열에 저장하고 API에서는 `body`로 매핑합니다.
+- 토큰이 없거나 유효하지 않으면 자료를 내보내지 않고 JSON 오류와 401을 반환합니다. 모든 자료 응답은 `no-store`입니다.
 
-## 서버 설정과 배포
+## 이번 단계에 남는 약점
 
-Vercel 프로젝트의 Environment Variables에 다음 두 값을 등록합니다.
+로그인 확인은 소유권 확인과 다릅니다. **단건 GET·PUT·DELETE는 아직 소유자를 검사하지 않습니다.** 다른 계정의 ID를 알면 접근할 수 있는 허점은 4단계에서 고칩니다. 목록만 로그인 사용자 소유 메모로 제한합니다.
+로그아웃해도 이미 발급된 액세스 토큰은 만료될 때까지 유효할 수 있습니다. 즉시 토큰 회수 기능을 구현했다고 주장하지 않습니다.
+이전 공개 커밋·옛 배포 이력은 남아 있습니다. 과거 노출은 해소되지 않았습니다. 가상 자료만 사용합니다.
 
-- `SUPABASE_URL`: 이번 실습용 Supabase 프로젝트 URL
-- `SUPABASE_SECRET_KEY`: 같은 프로젝트의 서버 전용 Secret key
+## DB 준비
 
-키는 Vercel의 비밀 입력란에만 저장합니다. 브라우저 코드, Git, 로그, 제출 묶음에는 넣지 않습니다. 환경변수 변경 후에는 새 배포가 필요합니다.
+같은 Supabase 프로젝트의 SQL Editor에서 `migrations/003-auth-notes.sql`을 실행합니다.
+기존 메모 본문과 `owner_id`를 보존하고 숫자 ID를 UUID로 바꿉니다. RLS를 유지하고 일반 역할의 직접 접근을 차단하며 서버 역할에 CRUD 권한을 부여합니다.
+기존 네 메모는 소유자가 없는 상태로 DB에 남습니다. 새 계정의 목록에 자동 배정하지 않습니다. 로그인 뒤 직접 추가한 메모가 내 목록에 표시됩니다.
+`owner_id`에는 auth.users 외래키를 걸지 않습니다. 제공된 심판의 시험 계정도 확인 도우미를 통해 요청할 수 있어야 합니다.
 
-Supabase 테이블: `public.notes(id bigint primary key, owner_id uuid, title text, content text)`.
-실습 SQL은 공개 저장소 밖에서 SQL Editor로 실행합니다. 메모 본문이 포함된 SQL 파일은 커밋하지 않습니다.
+## 계정과 환경변수
 
-Vercel은 루트 `api/notes.js`를 서버 함수로 배포하고 `public`을 정적 파일로 배포합니다.
-`npm run build`는 공개 자료를 빈 목록으로 만들고 Vercel 시스템 변수에서 실제 커밋과 저장소를 읽어 `/aleph.json`을 생성합니다.
-`X-Content-Type-Options: nosniff`를 응답에 적용합니다.
+Supabase Authentication → Users에서 실습용 계정 A를 준비합니다. 비밀번호는 공식 입력 화면에서 직접 설정하며 코드·Git·채팅에 공유하지 않습니다.
+이메일 인증을 요구하는 설정이면 인증을 완료해야 로그인됩니다. 가입 버튼은 이번 화면에 구현하지 않았습니다.
 
-## 로컬 검사
+Vercel의 기존 `SUPABASE_URL`, `SUPABASE_SECRET_KEY` 환경변수를 유지합니다.
+`SUPABASE_URL`은 `aleph.config.json`의 identityProvider 발급자와 같은 프로젝트여야 합니다.
+공개 URL과 키는 `src/browser-config.js`, 검증 발급자·대상·JWKS 및 실제 API 경로는 `aleph.config.json`에 있습니다.
+`judgeIssuer`와 `src/verify-login.mjs`는 원본 그대로 유지했습니다.
+
+## 빌드와 검사
 
 ```sh
 npm ci
@@ -33,32 +41,24 @@ node --test test/*.test.mjs
 npm run build -- --local
 ```
 
-로컬 빌드는 정적 결과물만 준비하며, Vercel 서버 함수나 실제 Supabase 연결 성공을 증명하지 않습니다.
-정상 결과: 코드 검사 통과, 공개 JSON의 메모 0건.
-거부 결과: 자료 API의 POST 요청은 405, 서버 설정 누락은 503, DB 오류는 비밀값 없는 502 응답.
+`npm run build`는 공식 SDK를 브라우저용 `public/app.js`로 묶고, 공개 JSON을 빈 목록으로 유지하며 `/aleph.json`을 실제 Vercel 환경정보로 생성합니다.
+서버 전용 파일이나 환경변수는 브라우저 빌드에 포함하지 않습니다. Vercel에 서버 키를 저장한 뒤 GitHub 변경을 배포합니다.
+보안 헤더 `X-Content-Type-Options: nosniff`는 유지합니다.
 
-## 현재 파일의 메모·비밀값 검사
-
-공개 자료에서 문장을 다시 복사해 저장하지 말고, DB에 보관한 메모 문장으로 최신 작업 파일과 배포 정적 파일을 비교합니다.
-
-```sh
-git grep -n -E '실습용 가상 .* 기록' -- .
-```
-
-검색 결과가 없어야 합니다. 키 검사 결과에는 값 자체를 출력하지 않습니다.
-외부 검사 결과나 옛 커밋을 현재 커밋 검사 결과로 대신하지 않습니다.
+로컬 테스트는 실제 Supabase 계정 로그인이나 배포 성공을 대신하지 않습니다. 합성 키와 시험 토큰으로 서명 위조·만료·잘못된 대상·다른 발급자 거부, 인증 없는 읽기와 쓰기 거부, 서버 소유자 지정, CRUD/404와 오류 정보 비노출을 검사합니다.
 
 ## 배포 후 직접 확인
 
-1. 첫 화면에 가상 자료 카드 네 개가 표시되는지 확인합니다.
-2. `/data.json`의 메모가 0건인지 확인합니다.
-3. `/aleph.json`의 단계 2, 저장소, 커밋을 실제 배포와 비교합니다.
-4. 첫 화면 응답의 `X-Content-Type-Options`가 `nosniff`인지 확인합니다.
-5. `/api/notes`는 비로그인으로도 읽힙니다. 이 남은 약점을 기록합니다.
-6. 공개용 Supabase 키로 DB 직접 읽기는 거부되어야 합니다. SQL 결과만으로 실제 HTTP 검증까지 했다고 기록하지 않습니다.
+1. 시크릿 창에서 자료 대신 로그인 화면이 나타나는지 확인합니다.
+2. `/api/notes`에 토큰 없이 GET/POST, 단건 경로에 GET/PUT/DELETE를 보내 JSON 오류와 401/403인지 확인합니다.
+3. A 계정으로 로그인하고 가상 메모 추가 → 수정 → 삭제 → 로그아웃을 확인합니다. 비밀번호·토큰은 검사 기록에 출력하지 않습니다.
+4. 서버 키가 브라우저 코드에 없는지 확인합니다. `/data.json`은 메모 0건이어야 합니다.
+5. `/aleph.json`의 단계 3·저장소·커밋과 실제 GitHub 배포를 대조합니다.
+6. 로그인 없는 Supabase 직접 DB 읽기는 거부되어야 합니다. 정상 로그인과 별개 검사입니다.
 
-## 저장점과 제출 묶음
+## 저장점과 제출
 
-실제 검사 후 커밋을 만들고, 제외 처리된 `bundle-notes.json`에 `explanation`(변경·검사·남은 한계 설명)과 `blockedAt`을 기록한 뒤 `npm run bundle`을 실행합니다.
-이 명령은 배포에 실제 요청을 보내 점검합니다. 생성된 `artifacts/submission.json`과 `bundle-notes.json`은 커밋하지 않습니다.
-배포가 이전 커밋이면 먼저 배포를 완료합니다. 로컬 점검은 수업 포털의 심판 판정이 아닙니다.
+변경을 `3단계 저장점`으로 커밋한 다음 실제 배포에서 검사합니다.
+제외 처리된 `bundle-notes.json`에 실제 확인과 미확인 사항, 남은 약점을 기록하고 `npm run bundle`을 실행합니다.
+`src/attack-check.mjs`는 배포된 URL에 직접 요청하여 비로그인 거부와 공개 파일·메타데이터·헤더를 검사합니다. 사용자 비밀번호나 토큰은 요구하지 않으며 정상 A 계정 CRUD는 별도로 확인해야 합니다.
+제출 묶음과 로그에 비밀키·사용자 토큰·메모 본문을 넣지 않습니다. 로컬 자기 점검은 운영 심판 판정이 아닙니다.
