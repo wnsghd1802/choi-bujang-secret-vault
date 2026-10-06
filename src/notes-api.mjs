@@ -44,6 +44,9 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
     if (['POST', 'PUT'].includes(req.method)) {
       try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
       catch { return fail(400, 'JSON 형식을 확인해 주세요.'); }
+      if (req.method === 'PUT' && body && Object.hasOwn(body, 'owner_id') && body.owner_id !== actor.userId) {
+        return fail(403, '메모 소유자는 변경할 수 없습니다.');
+      }
       if (!body || Array.isArray(body) || typeof body.title !== 'string' || !body.title.trim()
           || body.title.length > 120 || typeof body.body !== 'string' || body.body.length > 10000) {
         return fail(400, '제목은 1~120자, 내용은 10,000자 이내로 입력해 주세요.');
@@ -72,13 +75,12 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
         if (error) throw error;
         return res.status(201).json(view(data));
       }
-      // Stage 3 authenticates requests but deliberately does not check item ownership.
-      // Cross-account GET/PUT/DELETE is the remaining stage 4 exercise.
+      // Match owner and ID atomically, including writes. Never update owner_id from input.
       let query = db.from('notes');
       if (req.method === 'GET') query = query.select(fields);
       if (req.method === 'PUT') query = query.update({ title: body.title.trim(), content: body.body });
       if (req.method === 'DELETE') query = query.delete();
-      query = query.eq('id', id);
+      query = query.eq('id', id).eq('owner_id', actor.userId);
       if (req.method !== 'GET') query = query.select(fields);
       const { data, error } = await run(query.maybeSingle());
       if (error) throw error;

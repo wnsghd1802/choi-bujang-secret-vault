@@ -86,12 +86,12 @@ test('CRUD uses verified owner, returns required shapes, lists own notes and del
   res=response(); await collection(request('GET'),res);
   assert.equal(res.body.length,1); assert.equal(res.body[0].id,id);
   res=response(); await item(request('GET',null,id),res); assert.equal(res.code,200);
-  res=response(); await item(request('PUT',{title:'updated',body:'updated',owner_id:B},id),res);
+  res=response(); await item(request('PUT',{title:'updated',body:'updated'},id),res);
   assert.equal(res.body.body,'updated'); assert.equal(db.rows.find(r=>r.id===id).owner_id,A);
   res=response(); await item(request('DELETE',null,id),res); assert.equal(res.body.deleted,true);
   res=response(); await item(request('GET',null,id),res); assert.equal(res.code,404);
-  // Expected stage 3 limitation: known IDs of other owners are not yet protected.
-  res=response(); await item(request('GET',null,NOTE),res); assert.equal(res.code,200);
+  // Stage 4: known IDs of other owners are protected as well.
+  res=response(); await item(request('GET',null,NOTE),res); assert.equal(res.code,404);
 });
 
 test('supplied UUID is retained, duplicates conflict, malformed inputs fail before DB', async () => {
@@ -109,4 +109,35 @@ test('database errors never reach clients and unsupported methods return 405', a
   const handler=createNotesHandler({db,verifyLogin:verifier});let res=response();
   await handler(request('GET'),res);assert.equal(res.code,502);assert.doesNotMatch(JSON.stringify(res.body),/PRIVATE_DATABASE_DETAIL/);
   res=response();await handler(request('PATCH'),res);assert.equal(res.code,405);
+});
+
+test('both owners keep CRUD, cannot read/update/delete each other, and cannot transfer ownership', async () => {
+  const db=fakeDb();
+  const list=createNotesHandler({db,verifyLogin:verifier});
+  const item=createNotesHandler({item:true,db,verifyLogin:verifier});
+  const tokens=[good,await token({sub:B,aleph_identity:'b'})];
+  const ids=[];
+  for(let i=0;i<2;i++){
+    const res=response();
+    await list(request('POST',{title:'owner test',body:'fiction'},null,tokens[i]),res);
+    assert.equal(res.code,201);ids.push(res.body.id);
+  }
+  for(let i=0;i<2;i++){
+    let res=response();await list(request('GET',null,null,tokens[i]),res);
+    assert.deepEqual(res.body.map(n=>n.id),[ids[i]]);
+    res=response();await item(request('GET',null,ids[i],tokens[i]),res);assert.equal(res.code,200);
+    res=response();await item(request('PUT',{title:'mine',body:'edited'},ids[i],tokens[i]),res);assert.equal(res.code,200);
+    const snapshot=structuredClone(db.rows);
+    for(const method of ['GET','PUT','DELETE']){
+      res=response();await item(request(method,{title:'intrusion',body:'rejected'},ids[1-i],tokens[i]),res);
+      assert.equal(res.code,404);assert.deepEqual(db.rows,snapshot);
+      assert.deepEqual(Object.keys(res.body),['error']);
+    }
+    res=response();await item(request('PUT',{title:'transfer',body:'rejected',owner_id:i===0?B:A},ids[i],tokens[i]),res);
+    assert.equal(res.code,403);assert.deepEqual(db.rows,snapshot);
+  }
+  for(let i=0;i<2;i++){
+    let res=response();await item(request('DELETE',null,ids[i],tokens[i]),res);assert.equal(res.code,200);
+    res=response();await item(request('GET',null,ids[i],tokens[i]),res);assert.equal(res.code,404);
+  }
 });

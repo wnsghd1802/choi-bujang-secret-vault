@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step === 3) return runStageThreeChecks(config);
+  if ([3, 4].includes(config.step)) return runStageThreeChecks(config);
   if (config.step === 2) return runStageTwoChecks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
@@ -65,8 +65,8 @@ async function runStageThreeChecks(config) {
     observed: file.status === 404 || (file.ok && Array.isArray(data?.notes) && data.notes.length === 0) ? '공개 메모 없음 확인' : '공개 파일 확인 실패' });
   const metadata = await get('/aleph.json');
   const identity = await metadata.json().catch(() => null);
-  results.push({ attackId: 'deployment_identity', expected: '3단계 배포 정보와 저장소 일치',
-    observed: metadata.ok && identity?.step === 3 && identity?.repoUrl === config.repoUrl ? '단계와 저장소 일치; 커밋 별도 대조 필요' : '배포 정보 불일치' });
+  results.push({ attackId: 'deployment_identity', expected: `${config.step}단계 배포 정보와 저장소 일치`,
+    observed: metadata.ok && identity?.step === config.step && identity?.repoUrl === config.repoUrl ? '단계와 저장소 일치; 커밋 별도 대조 필요' : '배포 정보 불일치' });
   const root = await get('/');
   results.push({ attackId: 'security_header', expected: '첫 화면 정상 응답과 nosniff',
     observed: root.ok && root.headers.get('x-content-type-options') === 'nosniff' ? '정상 응답과 nosniff 확인' : '응답 또는 헤더 확인 실패' });
