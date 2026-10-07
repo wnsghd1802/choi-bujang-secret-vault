@@ -1,0 +1,15 @@
+{
+  "mode": "fixture-replay",
+  "alerts": 28,
+  "extractedRows": 28,
+  "counts": {
+    "block": 10,
+    "alert": 9,
+    "record": 9
+  },
+  "logEntriesAppended": 19,
+  "normalEvents": 9,
+  "normalBlockedIds": [],
+  "simulatedDenied": 10,
+  "integration": "adapter-tested-only; production-engine-not-connected; Jev-not-connected"
+}

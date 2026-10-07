@@ -1,0 +1,12 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "source": "https://attack.mitre.org/techniques/T1110/",
+  "note": "MITRE는 공격 형태의 근거입니다. 아래 숫자는 이 실습의 보수적인 설정이며 MITRE가 정한 임계값이 아닙니다.",
+  "windowSeconds": 300,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    {"id":"repeated-failures","technique":"T1110.001","source":"https://attack.mitre.org/techniques/T1110/001/","condition":"같은 출발 주소·계정의 5분 내 실패 30건 이상, 또는 T1110 고수준 집계 경보의 실패 30건 이상. 명시된 집계 시간이 5분을 넘으면 알림만 남깁니다.","minCount":30,"minLevel":10,"confidence":0.95},
+    {"id":"password-spray","technique":"T1110.003","source":"https://attack.mitre.org/techniques/T1110/003/","condition":"T1110 고수준 경보에서 같은 비밀번호를 8개 이상 계정에 대입한 증거가 함께 있습니다.","minAccounts":8,"minLevel":10,"confidence":0.93},
+    {"id":"multi-account-failures","technique":"T1110","source":"https://attack.mitre.org/techniques/T1110/","condition":"T1110 고수준 경보에서 15개 이상 계정에 일정 간격의 실패가 반복됩니다.","minAccounts":15,"minLevel":10,"confidence":0.9}
+  ]
+}

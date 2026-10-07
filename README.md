@@ -1,5 +1,13 @@
 # BYTE BACK 방어전 — 5단계: 자료 요청을 서버 한곳으로
 
+## 보너스 XDR-01 저장점
+
+`npm run xdr:run -- brute-force`로 무차별 로그인 경보 28건을 분류합니다. 로컬 결과는 block 10 · alert 9 · record 9이며 정상 경보 차단은 0건입니다. `node xdr/brute-force/replay.mjs`로 만료되는 주소 거부 규칙과 기존 정책 전달을 가상 시각으로 확인하고 `xdr/alerts.log`에 알림을 추가합니다.
+
+자세한 조건과 한계는 [XDR-01 안내](xdr/brute-force/README.md)를 봅니다. Jev와 실제 운영 ZTNA 엔진은 아직 연결되지 않았습니다. 현재 ZTNA 요청 계약에는 출발 IP가 없어 기존 판정기를 임의로 수정하지 않고 검증된 주소 공급자와 등록된 거부 응답을 받는 연결 부품을 제공했습니다. 로컬 시험은 실제 사이트 차단이나 심판 통과 증명이 아닙니다.
+
+확인 명령: `node --test test/stage2.test.mjs test/stage3.test.mjs test/stage5.test.mjs test/brute-force.test.mjs test/xdr-run.test.mjs`. 25개 검사가 통과했습니다. 이번 Windows 작업 환경의 기존 화면 빌드는 상위 폴더 읽기 권한 오류로 확인하지 못했습니다. 기존 자료실 코드·배포 설정·DB는 변경하지 않았습니다.
+
 ## 현재 기능
 
 - 브라우저의 메모 직접 Supabase 호출은 없음: 기존 `/api/notes` 경로를 유지합니다.

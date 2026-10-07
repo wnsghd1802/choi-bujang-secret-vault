@@ -1,0 +1,109 @@
+{
+  "mode": "fixture-replay-only",
+  "simulatedAt": "2026-09-27T07:10:05.000Z",
+  "ruleCandidates": [
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "203.0.113.10",
+      "action": "deny",
+      "createdAt": "2026-09-27T00:12:01.000Z",
+      "expiresAt": "2026-09-27T00:27:01.000Z",
+      "evidenceIds": [
+        "event-f7cf4d421ef075ce6148708b"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "203.0.113.10",
+      "action": "deny",
+      "createdAt": "2026-09-27T00:12:01.000Z",
+      "expiresAt": "2026-09-27T00:27:40.000Z",
+      "evidenceIds": [
+        "event-f7cf4d421ef075ce6148708b",
+        "event-4c485e60125bf6df8d2520fa"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "198.51.100.20",
+      "action": "deny",
+      "createdAt": "2026-09-27T00:14:02.000Z",
+      "expiresAt": "2026-09-27T00:29:02.000Z",
+      "evidenceIds": [
+        "event-8dfd38e6f85c5f71bbfea7b0"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "192.0.2.30",
+      "action": "deny",
+      "createdAt": "2026-09-27T00:20:11.000Z",
+      "expiresAt": "2026-09-27T00:35:11.000Z",
+      "evidenceIds": [
+        "event-458ba6baa1ba2ef807026bb9"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "203.0.113.21",
+      "action": "deny",
+      "createdAt": "2026-09-27T00:21:00.000Z",
+      "expiresAt": "2026-09-27T00:36:00.000Z",
+      "evidenceIds": [
+        "event-4b7360628b34a20906132e9e"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "198.51.100.44",
+      "action": "deny",
+      "createdAt": "2026-09-27T02:02:15.000Z",
+      "expiresAt": "2026-09-27T02:17:15.000Z",
+      "evidenceIds": [
+        "event-a2c624a2518ee358e0efae00"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "203.0.113.15",
+      "action": "deny",
+      "createdAt": "2026-09-27T02:05:40.000Z",
+      "expiresAt": "2026-09-27T02:20:40.000Z",
+      "evidenceIds": [
+        "event-b15bff0ff5c98110494f39e9"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "192.0.2.18",
+      "action": "deny",
+      "createdAt": "2026-09-27T04:10:02.000Z",
+      "expiresAt": "2026-09-27T04:25:02.000Z",
+      "evidenceIds": [
+        "event-9ed5b6decee7cc2f1a5253f8"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "198.51.100.8",
+      "action": "deny",
+      "createdAt": "2026-09-27T05:22:18.000Z",
+      "expiresAt": "2026-09-27T05:37:18.000Z",
+      "evidenceIds": [
+        "event-b2a98164d1e6be2ccc0a7fa6"
+      ]
+    },
+    {
+      "ruleId": "xdr.brute-force",
+      "sourceIp": "203.0.113.40",
+      "action": "deny",
+      "createdAt": "2026-09-27T06:40:01.000Z",
+      "expiresAt": "2026-09-27T06:55:01.000Z",
+      "evidenceIds": [
+        "event-d76c12caca55dde6d2cec8e2"
+      ]
+    }
+  ],
+  "activeAtReplayEnd": [],
+  "activeNow": []
+}
