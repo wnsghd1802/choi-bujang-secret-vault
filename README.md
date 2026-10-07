@@ -2,7 +2,7 @@
 
 ## 보너스 XDR-01 저장점
 
-`npm run xdr:run -- brute-force`로 무차별 로그인 경보 28건을 분류합니다. 기존 fixture 결과는 block 10 · alert 9 · record 9, 정상 경보 차단 0건을 유지합니다. 정제된 경보 행(timestamp/sourceAddress/account/ruleLevel/description)도 직접 판정하며, MITRE 태그나 높은 rule level이 없어도 짧은 시간 반복 실패·여러 계정 동일 비밀번호 대입처럼 행동 근거가 명확하면 block합니다. 성공 정황·소수 실패·정상 로그인/로그아웃은 차단하지 않습니다. `node xdr/brute-force/replay.mjs`로 만료되는 주소 거부 규칙과 기존 정책 전달을 가상 시각으로 확인하고 `xdr/alerts.log`에 알림을 추가합니다.
+`npm run xdr:run -- brute-force`로 무차별 로그인 경보 28건을 분류합니다. 공개 fixture 결과는 block 10 · alert 9 · record 9, 정상 block 0건입니다. 읽기 결과는 과제의 다섯 필드(timestamp/sourceAddress/account/ruleLevel/description)로 맞췄고, 패턴은 MITRE ATT&CK T1110 근거의 반복 로그인 실패와 password spray 두 개만 유지합니다. 명확한 공격은 rule level을 필수 조건으로 삼지 않고 행동 근거로 block하며, 애매한 경보는 Jev 미응답 시 alert로 남깁니다. `node xdr/brute-force/replay.mjs`로 만료 시각과 실제 근거 경보 번호가 붙은 거부 후보 및 `xdr/alerts.log` 기록을 확인합니다.
 
 자세한 조건과 한계는 [XDR-01 안내](xdr/brute-force/README.md)를 봅니다. Jev와 실제 운영 ZTNA 엔진은 아직 연결되지 않았습니다. 현재 ZTNA 요청 계약에는 출발 IP가 없어 기존 판정기를 임의로 수정하지 않고 검증된 주소 공급자와 등록된 거부 응답을 받는 연결 부품을 제공했습니다. 로컬 시험은 실제 사이트 차단이나 심판 통과 증명이 아닙니다.
 

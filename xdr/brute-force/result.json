@@ -6,169 +6,169 @@
       "alertId": "bf-01",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-02",
       "action": "block",
-      "confidence": 0.93,
-      "reason": "password-spray: 여러 계정에 같은 비밀번호를 대입한 증거가 있습니다."
+      "confidence": 0.95,
+      "reason": "password-spray: 여러 계정에 같은 비밀번호를 반복 대입한 근거가 있습니다."
     },
     {
       "alertId": "bf-03",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-04",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-05",
       "action": "block",
-      "confidence": 0.9,
-      "reason": "multi-account-failures: 여러 계정에 일정 간격의 실패가 반복됩니다."
+      "confidence": 0.95,
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-06",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-07",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-08",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-09",
       "action": "block",
-      "confidence": 0.93,
-      "reason": "password-spray: 여러 계정에 같은 비밀번호를 대입한 증거가 있습니다."
+      "confidence": 0.95,
+      "reason": "password-spray: 여러 계정에 같은 비밀번호를 반복 대입한 근거가 있습니다."
     },
     {
       "alertId": "bf-10",
       "action": "block",
       "confidence": 0.95,
-      "reason": "repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다."
+      "reason": "rapid-same-source-failures: 짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다."
     },
     {
       "alertId": "bf-11",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-12",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-13",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-14",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-15",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-16",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-17",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-18",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-19",
       "action": "alert",
-      "confidence": 0.6,
-      "reason": "ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다."
+      "confidence": 0.5,
+      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
     },
     {
       "alertId": "bf-20",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-21",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-22",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-23",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-24",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-25",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-26",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-27",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     },
     {
       "alertId": "bf-28",
       "action": "record",
       "confidence": 0.1,
-      "reason": "normal-event: 반복 대입 근거가 없어 기록만 남깁니다."
+      "reason": "normal-event: 반복 공격 근거가 없는 정상 인증 이벤트입니다."
     }
   ],
   "counts": {

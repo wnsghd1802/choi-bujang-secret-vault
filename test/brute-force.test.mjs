@@ -71,7 +71,7 @@ test('Jev 미연결/오류/잘못된 응답/시간 초과는 alert로 남긴다'
 test('추출은 허용한 5개 항목만 반환하고 알려진 비밀값 형태를 제거한다', () => {
   const out = readAlert(event({ rule: { level: 6, description: 'password="do not log" token=abc Bearer xyz user@example.test', mitre: [] },
     data: { srcip: '192.0.2.100', srcuser: 'person@example.test', password: 'raw-private-value' } }));
-  assert.deepEqual(Object.keys(out), ['timestamp', 'sourceIp', 'account', 'level', 'description']);
+  assert.deepEqual(Object.keys(out), ['timestamp', 'sourceAddress', 'account', 'ruleLevel', 'description']);
   assert.doesNotMatch(JSON.stringify(out), /do not log|abc|xyz|person@|user@|raw-private-value/);
 });
 
@@ -83,7 +83,7 @@ test('차단 규칙은 15분 뒤 만료되고 과거 재생/미래 경보/애매
   assert.equal(store.add(alert, out, at - 1), null);
   const rule = store.add(alert, out, at);
   assert.equal(rule.action, 'deny');
-  assert.ok(rule.evidenceIds.length);
+  assert.deepEqual(rule.evidenceAlertIds, [alert.id]);
   assert.ok(store.check(alert.data.srcip, at + 899000));
   assert.equal(store.check(alert.data.srcip, at + 900000), null);
   assert.equal(store.add(alert, out, at + 900000), null);
