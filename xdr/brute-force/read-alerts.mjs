@@ -11,6 +11,7 @@ const SECRET_LIKE = [
   /\beyJ[\w-]+\.[\w-]+\.[\w-]+\b/gu,
   /\b(?:sk[-_]|sb_secret_)[\w-]+/gu,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
+  /[\w.+-]+@[\w.-]+\.[a-z]{2,}/giu,
 ];
 
 export function safeDescription(value) {
