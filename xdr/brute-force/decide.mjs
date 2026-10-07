@@ -58,7 +58,7 @@ export function facts(alert) {
     accountCount: Math.max(new Set(names).size, koreanAccounts, englishAccounts),
     t1110: Array.isArray(tags) && tags.some(tag => /^T1110(?:\.\d{3})?$/u.test(String(tag))),
     windowSeconds: observedWindow,
-    failure: /로그인\s*실패|인증\s*실패|sign[- ]?in\s*fail|login\s*fail|authentication\s*fail|비밀번호.{0,30}실패|실패.{0,30}로그인|failed|failure/iu.test(text),
+    failure: /로그인\s*실패|인증\s*실패|실패(?:가)?\s*\d+\s*(?:건|번|회)|sign[- ]?in\s*fail|login\s*fail|authentication\s*fail|비밀번호.{0,30}실패|실패.{0,30}로그인|failed|failure/iu.test(text),
     samePassword: /(?:같은|동일한?)\s*비밀번호|same\s+password|password\s*spray(?:ing)?|비밀번호\s*스프레이/iu.test(text),
     multiAccount: /여러\s*(?:계정|사용자)|서로\s*다른\s*(?:계정|사용자)|(?:계정|사용자)\s*\d+\s*개|계정\s*이름을\s*바꿔|multiple\s+(?:accounts|users)/iu.test(text),
     regular: /같은\s*간격|일정한\s*간격|regular\s*interval/iu.test(text),
