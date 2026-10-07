@@ -30,7 +30,8 @@ export function facts(alert) {
 export function createDecider({ jev, timeoutMs = 1500 } = {}) {
   const windows = new Map();
   let watermark = 0;
-  return async function decide(alert) {
+  // Local rules return immediately; only an actual Jev request is asynchronous.
+  return function decide(alert) {
     const f = facts(alert);
     // A multi-account summary may have targets without one representative user.
     if (!f.timestamp || !f.sourceIp || f.level === null || (!f.account && f.accountCount < spray.minAccounts)) {
@@ -68,6 +69,11 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     const suspicious = f.failure && (f.count >= 3 || f.level >= 5 || observedCount >= 3) || f.t1110 && f.level >= 5;
     if (!suspicious) return decision(0.1, 'normal-event: 반복 대입 근거가 없어 기록만 남깁니다.');
     if (typeof jev !== 'function') return decision(0.6, 'ambiguous-failures: 확인이 필요한 실패 경보이며 Jev 미연결로 알림만 남깁니다.');
+    return askJev(f, jev, timeoutMs);
+  };
+}
+
+async function askJev(f, jev, timeoutMs) {
     let timer;
     const controller = new AbortController();
     try {
@@ -83,7 +89,6 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     } catch {
       return decision(0.6, 'ambiguous-failures: Jev 응답 실패로 차단 없이 알림만 남깁니다.');
     } finally { clearTimeout(timer); }
-  };
 }
 
 export const decide = createDecider();

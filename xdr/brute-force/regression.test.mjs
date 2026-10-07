@@ -4,6 +4,17 @@ import { loadFixture } from './read-alerts.mjs';
 import { createDecider } from './decide.mjs';
 
 const fixture = await loadFixture();
+
+test('기본 판정기는 동기 호출과 await 호출에서 같은 결과를 반환한다', async () => {
+  const direct = createDecider();
+  const awaited = createDecider();
+  for (const alert of fixture.alerts) {
+    const result = direct(alert);
+    assert.equal(typeof result?.then, 'undefined', '기본 판단은 즉시 반환해야 한다');
+    assert.deepEqual(result, await awaited(alert));
+  }
+});
+
 const spray = () => {
   const alert = structuredClone(fixture.alerts.find(item => item.id === 'bf-02'));
   delete alert.data.srcuser;
