@@ -114,12 +114,10 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     const clearObserved = observedCount >= 30;
 
     if (clearSpray) {
-      const confidence = f.ruleLevel >= 10 ? 0.95 : 0.9;
-      return decision(confidence, SPRAY.name, '여러 계정에 같은 비밀번호를 반복 대입한 근거가 있습니다.');
+      return decision(1.0, SPRAY.name, '여러 계정에 같은 비밀번호를 반복 대입한 근거가 있습니다.');
     }
     if (clearRapid || clearIterativeGuess || clearHighVolume || clearRegularMulti || clearObserved) {
-      const confidence = f.ruleLevel >= 10 || f.count >= 30 || clearObserved ? 0.95 : 0.9;
-      return decision(confidence, RAPID.name, '짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다.');
+      return decision(1.0, RAPID.name, '짧은 시간 또는 반복 추측의 로그인 실패 근거가 명확합니다.');
     }
 
     const normalHint = /로그아웃|세션\s*유지|자료실\s*화면|로그인\s*상태가\s*유지/iu.test(f.description);
