@@ -17,15 +17,21 @@ export function safeDescription(value) {
 }
 
 export function readAlert(alert) {
-  const timestamp = typeof alert?.timestamp === 'string' && Number.isFinite(Date.parse(alert.timestamp))
-    ? new Date(alert.timestamp).toISOString() : null;
-  const account = typeof alert?.data?.srcuser === 'string' ? alert.data.srcuser : '';
+  const rawTimestamp = alert?.timestamp ?? alert?.time ?? alert?.at;
+  const rawSource = alert?.data?.srcip ?? alert?.sourceIp ?? alert?.sourceAddress ?? alert?.srcip;
+  const rawAccount = alert?.data?.srcuser ?? alert?.account ?? alert?.srcuser ?? alert?.user;
+  const rawLevel = alert?.rule?.level ?? alert?.level ?? alert?.ruleLevel;
+  const rawDescription = alert?.rule?.description ?? alert?.description;
+  const timestamp = typeof rawTimestamp === 'string' && Number.isFinite(Date.parse(rawTimestamp))
+    ? new Date(rawTimestamp).toISOString() : null;
+  const account = typeof rawAccount === 'string' ? rawAccount : '';
+  const level = Number(rawLevel);
   return {
     timestamp,
-    sourceIp: typeof alert?.data?.srcip === 'string' && isIP(alert.data.srcip) ? alert.data.srcip : null,
+    sourceIp: typeof rawSource === 'string' && isIP(rawSource) ? rawSource : null,
     account: /^user\d{1,6}$/u.test(account) ? account : account ? `account-${digest(account)}` : null,
-    level: Number.isInteger(alert?.rule?.level) && alert.rule.level >= 0 && alert.rule.level <= 16 ? alert.rule.level : null,
-    description: safeDescription(alert?.rule?.description),
+    level: Number.isInteger(level) && level >= 0 && level <= 16 ? level : null,
+    description: safeDescription(rawDescription),
   };
 }
 
