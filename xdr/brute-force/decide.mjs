@@ -62,7 +62,7 @@ export function facts(alert) {
     samePassword: /(?:같은|동일한?)\s*비밀번호|same\s+password|password\s*spray(?:ing)?|비밀번호\s*스프레이/iu.test(text),
     multiAccount: /여러\s*(?:계정|사용자)|서로\s*다른\s*(?:계정|사용자)|(?:계정|사용자)\s*\d+\s*개|계정\s*이름을\s*바꿔|multiple\s+(?:accounts|users)/iu.test(text),
     regular: /같은\s*간격|일정한\s*간격|regular\s*interval/iu.test(text),
-    strongRapid: /\d+\s*(?:초|분)\s*(?:안|동안|내)|\d+\s*(?:seconds?|minutes?)|짧은\s*시간|반복|연속|연달아|이어졌|쌓였|repeated|rapid|consecutive|burst/iu.test(text),
+    strongRapid: /\d+\s*(?:초|분)\s*(?:안|동안|내)|\d+\s*(?:seconds?|minutes?)|짧은\s*시간|반복|연속|연달아|이어졌|쌓였|몰렸|몰림|몰려|집중|급증|폭증|repeated|rapid|consecutive|burst|clustered/iu.test(text),
     iterativeGuess: /비밀번호.{0,30}(?:한\s*글자씩|바꿔|변형|추측)|password.{0,30}(?:guess|vary|change)/iu.test(text),
     noSuccess,
     successAfter,
@@ -104,12 +104,11 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     const explicitSingle = f.count === 1 || /(?:^|[^0-9])1\s*(?:건|번|회)(?:[^0-9]|$)|한\s*번/u.test(f.description);
 
     const clearSpray = f.multiAccount && f.samePassword && !f.successAfter && !explicitSingle;
-    const clearRapid = f.failure && f.strongRapid && shortEnough && !f.successAfter && !explicitSingle
-      && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10));
-    const clearIterativeGuess = f.failure && f.iterativeGuess && shortEnough && !f.successAfter && !explicitSingle
-      && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10));
-    const clearHighVolume = f.failure && shortEnough && !f.successAfter && !explicitSingle
-      && f.count >= 20 && (f.ruleLevel >= 10 || f.noSuccess);
+    // 패턴 자체가 명확하면 count/rule level을 추가 하드 게이트로 쓰지 않습니다.
+    const clearRapid = f.failure && f.strongRapid && shortEnough && !f.successAfter && !explicitSingle;
+    const clearIterativeGuess = f.failure && f.iterativeGuess && shortEnough && !f.successAfter && !explicitSingle;
+    const clearHighVolume = f.failure && !f.successAfter && !explicitSingle && f.count >= 20
+      && ((f.windowSeconds !== null && shortEnough) || f.strongRapid || f.noSuccess);
     const clearRegularMulti = f.failure && f.regular && f.accountCount >= 8 && !f.successAfter && !explicitSingle;
     const clearObserved = observedCount >= 30;
 
