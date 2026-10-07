@@ -32,7 +32,8 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
   let watermark = 0;
   return async function decide(alert) {
     const f = facts(alert);
-    if (!f.timestamp || !f.sourceIp || !f.account || f.level === null) {
+    // A multi-account summary may have targets without one representative user.
+    if (!f.timestamp || !f.sourceIp || f.level === null || (!f.account && f.accountCount < spray.minAccounts)) {
       return decision(0.5, 'invalid-alert: 필수 경보 정보가 부족하여 차단하지 않습니다.');
     }
     const at = Date.parse(f.timestamp);
@@ -44,7 +45,7 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     }
     let observedCount = 0;
     // Only individual failures are summed. Aggregated Wazuh counts may overlap.
-    if (f.failure && f.count <= 1 && at >= oldest && typeof alert?.id === 'string') {
+    if (f.account && f.failure && f.count <= 1 && at >= oldest && typeof alert?.id === 'string') {
       const key = `${f.sourceIp}|${f.account}`;
       const events = windows.get(key) ?? [];
       const id = digest(alert.id);
@@ -55,7 +56,7 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
       observedCount = bounded.filter(event => event.at <= at && event.at >= at - patterns.windowSeconds * 1000).length;
     }
     const shortEnough = f.windowSeconds === null || f.windowSeconds <= patterns.windowSeconds;
-    if (f.failure && shortEnough && ((f.t1110 && f.level >= repeated.minLevel && f.count >= repeated.minCount) || observedCount >= repeated.minCount)) {
+    if (f.account && f.failure && shortEnough && ((f.t1110 && f.level >= repeated.minLevel && f.count >= repeated.minCount) || observedCount >= repeated.minCount)) {
       return decision(repeated.confidence, 'repeated-failures: 같은 출발 주소·계정의 반복 실패가 차단 기준을 넘었습니다.');
     }
     if (f.t1110 && shortEnough && f.level >= spray.minLevel && f.samePassword && f.accountCount >= spray.minAccounts) {
