@@ -58,7 +58,7 @@ export function facts(alert) {
     accountCount: Math.max(new Set(names).size, koreanAccounts, englishAccounts),
     t1110: Array.isArray(tags) && tags.some(tag => /^T1110(?:\.\d{3})?$/u.test(String(tag))),
     windowSeconds: observedWindow,
-    failure: /로그인\s*실패|인증\s*실패|sign[- ]?in\s*fail|login\s*fail|authentication\s*fail|비밀번호.{0,30}실패|실패.{0,30}로그인|failed|failure/iu.test(text),
+    failure: /로그인\s*실패|인증\s*실패|실패(?:가)?\s*\d+\s*(?:건|번|회)|sign[- ]?in\s*fail|login\s*fail|authentication\s*fail|비밀번호.{0,30}실패|실패.{0,30}로그인|failed|failure/iu.test(text),
     samePassword: /(?:같은|동일한?)\s*비밀번호|same\s+password|password\s*spray(?:ing)?|비밀번호\s*스프레이/iu.test(text),
     multiAccount: /여러\s*(?:계정|사용자)|서로\s*다른\s*(?:계정|사용자)|(?:계정|사용자)\s*\d+\s*개|계정\s*이름을\s*바꿔|multiple\s+(?:accounts|users)/iu.test(text),
     regular: /같은\s*간격|일정한\s*간격|regular\s*interval/iu.test(text),
@@ -105,8 +105,13 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     const explicitSingle = f.count === 1 || /(?:^|[^0-9])1\s*(?:건|번|회)(?:[^0-9]|$)|한\s*번/u.test(f.description);
 
     const clearSpray = f.multiAccount && f.samePassword && !f.successAfter && !explicitSingle;
-    const clearRapid = f.failure && f.strongRapid && shortEnough && !f.successAfter && !explicitSingle
-      && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10));
+    // Clear bursts need both a short window and repetition; numeric Wazuh fields may be absent.
+    const burstWindow = /짧은\s*시간|\d+\s*초\s*(?:안|내|동안)|[1-5]\s*분\s*(?:안|내|동안)|rapid(?:ly)?|within\s*\d+\s*(?:minutes?|seconds?)/iu.test(f.description);
+    const burstPattern = /연속|반복|연달아|몰렸|몰린|몰림|집중|폭증|급증|쌓였|burst|repeated|consecutive|clustered/iu.test(f.description);
+    const clearBurst = f.failure && shortEnough && !f.successAfter && !explicitSingle
+      && burstWindow && burstPattern && (f.count === 0 || f.count >= 8);
+    const clearRapid = clearBurst || (f.failure && f.strongRapid && shortEnough && !f.successAfter && !explicitSingle
+      && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10)));
     const clearIterativeGuess = f.failure && f.iterativeGuess && shortEnough && !f.successAfter && !explicitSingle
       && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10));
     const clearHighVolume = f.failure && shortEnough && !f.successAfter && !explicitSingle
