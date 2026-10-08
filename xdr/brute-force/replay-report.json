@@ -11,5 +11,5 @@
   "normalEvents": 9,
   "normalBlockedIds": [],
   "simulatedDenied": 10,
-  "integration": "adapter-tested-only; production-engine-not-connected; Jev-not-connected"
+  "integration": "adapter-tested-only; production-engine-not-connected; local-classification-only"
 }
