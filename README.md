@@ -2,7 +2,7 @@
 
 ## 보너스 XDR-01 저장점
 
-`npm run xdr:run -- brute-force`로 무차별 로그인 경보 28건을 분류합니다. 공개 fixture 결과는 block 10 · alert 9 · record 9, 정상 block 0건입니다. 읽기 결과는 과제의 다섯 필드(timestamp/sourceAddress/account/ruleLevel/description)로 맞췄고, 패턴은 MITRE ATT&CK T1110 근거의 반복 로그인 실패와 password spray 두 개만 유지합니다. 명확한 공격은 rule level을 필수 조건으로 삼지 않고 행동 근거로 block하며, 애매한 경보는 Jev 미응답 시 alert로 남깁니다. `node xdr/brute-force/replay.mjs`로 만료 시각과 실제 근거 경보 번호가 붙은 거부 후보 및 `xdr/alerts.log` 기록을 확인합니다.
+`npm run xdr:run -- brute-force`로 무차별 로그인 경보 28건을 분류합니다. 공개 fixture 결과는 block 10 · alert 9 · record 9, 정상 block 0건입니다. 읽기 결과는 과제의 다섯 필드(timestamp/sourceAddress/account/ruleLevel/description)로 맞췄고, 패턴은 MITRE ATT&CK T1110 근거의 반복 로그인 실패와 password spray 두 개만 유지합니다. 명확한 공격은 rule level을 필수 조건으로 삼지 않고 행동 근거로 block하며, 행동 근거가 부족한 경보는 Jev 호출 없이 alert로 남깁니다. `node xdr/brute-force/replay.mjs`로 만료 시각과 실제 근거 경보 번호가 붙은 거부 후보 및 `xdr/alerts.log` 기록을 확인합니다.
 
 재검증(2026-10-08): Node.js 22의 별도 재구성 작업 디렉터리에서 `npm run xdr:run -- brute-force`를 실행해 28건 중 block 10 · alert 9 · record 9, 정상 오차단 0건을 확인했습니다. 재생성된 `result.json`의 Git blob SHA는 `373ef81de4dc8ffae6566f613820b973a9d09b17`로 저장소의 현행 파일과 같아 해당 파일은 변경하지 않았습니다. 이는 로컬 공개 경보 검사 결과이며 비공개 심판 통과 판정이나 실제 운영 ZTNA 연결을 의미하지 않습니다.
 
