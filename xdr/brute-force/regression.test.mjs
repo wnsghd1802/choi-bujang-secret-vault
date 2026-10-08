@@ -96,3 +96,17 @@ test('같은 발신지에서 짧은 시간 반복된 실패는 다양한 문장 
     assert.equal(result.action, 'block', description);
   }
 });
+
+test('행동 근거가 충분할 때 미기재 rule level만으로 확정 탐지를 포기하지 않는다', () => {
+  const result = createDecider()({ timestamp: '2026-09-27T00:00:00Z',
+    sourceAddress: '192.0.2.127',
+    description: '같은 주소에서 2분 동안 로그인 실패 40건을 반복했습니다.' });
+  assert.equal(result.action, 'block');
+});
+
+test('여러 계정에 동일 비밀번호가 설정됐다는 문장만으로 차단하지 않는다', () => {
+  const result = createDecider()({ timestamp: '2026-09-27T00:00:00Z',
+    sourceAddress: '192.0.2.128', ruleLevel: 7,
+    description: '여러 계정에 같은 비밀번호를 설정했습니다.' });
+  assert.notEqual(result.action, 'block');
+});
