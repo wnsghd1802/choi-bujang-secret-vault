@@ -84,3 +84,15 @@ test('출발 주소가 없으면 명확한 문구라도 차단 규칙을 만들�
   });
   assert.notEqual(out.action, 'block');
 });
+
+test('같은 발신지에서 짧은 시간 반복된 실패는 다양한 문장 표현에서도 탐지한다', () => {
+  const cases = [
+    '동일 주소에서 2분 동안 로그인 시도 30회를 거부했습니다.',
+    '30초 이내에 암호를 25회 틀렸습니다.',
+  ];
+  for (const description of cases) {
+    const result = createDecider()({ timestamp: '2026-09-27T00:00:00Z',
+      sourceAddress: '192.0.2.120', ruleLevel: 7, description });
+    assert.equal(result.action, 'block', description);
+  }
+});
