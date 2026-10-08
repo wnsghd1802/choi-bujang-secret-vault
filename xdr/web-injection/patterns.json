@@ -1,0 +1,13 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "web-injection",
+  "mitre": "T1190",
+  "minimumRepeatCount": 5,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    { "name": "sql-injection", "condition": "웹 입력에 SQL 구문 또는 DB 조회 연결 표식이 있고 같은 주소에서 반복된 경우", "basis": "MITRE ATT&CK T1190의 공개 애플리케이션 악용은 SQL 주입과 같은 웹 입력 취약점 이용을 포괄한다." },
+    { "name": "script-injection", "condition": "스크립트 삽입·실행 표식이 웹 입력에서 반복된 경우", "basis": "MITRE ATT&CK T1190의 웹 애플리케이션 취약점 악용에는 XSS 등의 스크립트 삽입 시도가 포함될 수 있다." },
+    { "name": "path-traversal", "condition": "여러 단계의 상위 디렉터리 접근 또는 명시적인 경로 이탈 표식이 반복된 경우", "basis": "MITRE ATT&CK T1190에서 취약한 경로 검증을 이용한 디렉터리 이탈은 공개 애플리케이션 악용의 한 형태이다." },
+    { "name": "command-injection", "condition": "웹 입력에 운영체제 명령 구분·실행 표식이 반복된 경우", "basis": "MITRE ATT&CK T1190은 웹 애플리케이션의 명령 주입 취약점을 진입점으로 사용하는 공격을 포함할 수 있다." }
+  ]
+}

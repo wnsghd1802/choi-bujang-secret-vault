@@ -1,0 +1,13 @@
+{
+  "moduleKey": "web-injection",
+  "mode": "fixture-replay-only",
+  "alerts": 26,
+  "counts": {
+    "block": 8,
+    "alert": 9,
+    "record": 9
+  },
+  "logEntriesAppended": 17,
+  "normalBlockedIds": [],
+  "integration": "adapter-tested-only; engine-verified-IP-and-registered-deny-not-connected"
+}

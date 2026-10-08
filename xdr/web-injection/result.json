@@ -1,0 +1,167 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "web-injection",
+  "decisions": [
+    {
+      "alertId": "wi-01",
+      "action": "block",
+      "confidence": 1,
+      "reason": "sql-injection: 주입 형태와 반복 요청 12건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-02",
+      "action": "block",
+      "confidence": 1,
+      "reason": "script-injection: 주입 형태와 반복 요청 9건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-03",
+      "action": "block",
+      "confidence": 1,
+      "reason": "path-traversal: 주입 형태와 반복 요청 8건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-04",
+      "action": "block",
+      "confidence": 1,
+      "reason": "sql-injection: 주입 형태와 반복 요청 20건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-05",
+      "action": "block",
+      "confidence": 1,
+      "reason": "sql-injection+script-injection: 주입 형태와 반복 요청 15건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-06",
+      "action": "block",
+      "confidence": 1,
+      "reason": "command-injection: 주입 형태와 반복 요청 11건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-07",
+      "action": "block",
+      "confidence": 1,
+      "reason": "path-traversal: 주입 형태와 반복 요청 14건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-08",
+      "action": "block",
+      "confidence": 1,
+      "reason": "sql-injection: 주입 형태와 반복 요청 10건이 함께 확인됐습니다."
+    },
+    {
+      "alertId": "wi-09",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-10",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-11",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-12",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-13",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-14",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-15",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-16",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-17",
+      "action": "alert",
+      "confidence": 0.55,
+      "reason": "review-required: 주입 가능성이 있지만 반복되는 명확한 공격이라는 증거가 부족합니다."
+    },
+    {
+      "alertId": "wi-18",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-19",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-20",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-21",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-22",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-23",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-24",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-25",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    },
+    {
+      "alertId": "wi-26",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event: 반복 주입 공격 근거가 없는 일반 웹 요청입니다."
+    }
+  ],
+  "counts": {
+    "block": 8,
+    "alert": 9,
+    "record": 9
+  }
+}

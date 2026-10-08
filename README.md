@@ -1,3 +1,11 @@
+## 보너스 XDR-02 저장점
+
+웹 입력 조작 보너스 과제를 `xdr/web-injection/`에 독립 모듈로 추가했습니다. `decide.mjs`는 **import/Jev/외부 요청/파일 I/O 없이** 원본 경보만으로 SQL 주입, 스크립트 삽입, 경로 이탈, 명령 구분자의 반복 단서를 판정합니다. T1190 태그나 수업 단어만으로 차단하지 않습니다.
+
+재현 명령: `npm run xdr:run -- web-injection`. 검사: `node --test xdr/web-injection/regression.test.mjs test/xdr-run.test.mjs`. 후보 차단/로그 모의 재생: `node xdr/web-injection/replay.mjs`. 공개 가상 경보 26건의 로컬 결과는 block 8, alert 9, record 9이며 정상 요청 차단은 0건입니다. 숫자는 목표나 비공개 심판 정답이 아닙니다.
+
+`respond.mjs`는 검증된 출발 IP와 등록된 ZTNA 거부 응답을 외부에서 제공받아야 하는 **연결 어댑터**입니다. 현재 실제 반 엔진은 IP 필드를 제공하지 않으므로 운영 차단은 미연결입니다. 기존 무차별 로그인 규칙, ZTNA 판정 규칙, 경보 원본, 배포/DB 설정은 변경하지 않았습니다.
+
 # BYTE BACK 방어전 — 5단계: 자료 요청을 서버 한곳으로
 
 ## 보너스 XDR-01 저장점
