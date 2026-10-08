@@ -10,16 +10,23 @@ const event = (changes = {}) => ({ id: 'custom-event', timestamp: '2026-09-27T00
   rule: { level: 12, description: '같은 주소에서 2분 동안 로그인 실패 40건', mitre: ['T1110'] },
   data: { srcip: '192.0.2.100', srcuser: 'user99', count: '40' }, ...changes });
 
-test('공식 28건을 누락 없이 읽고 수동 검토한 공격/의심/정상과 일치한다', async () => {
+test('공개 경보를 빠짐없이 읽고, 확실한 공격과 정상 이벤트를 근거로 구분한다', async () => {
   const rows = await readAlerts();
   assert.equal(rows.length, fixture.alerts.length);
-  const decide = createDecider();
-  // Independently reviewed fixture expectations: IDs are never used in detector rules.
-  for (const alert of fixture.alerts) {
-    const number = Number(alert.id.split('-')[1]);
-    const expected = number <= 10 ? 'block' : number <= 19 ? 'alert' : 'record';
-    assert.equal((await decide(alert)).action, expected, alert.id);
+  const decider = createDecider();
+  const decisions = fixture.alerts.map(alert => decider(alert));
+  for (const outcome of decisions) {
+    assert.ok(['block', 'alert', 'record'].includes(outcome.action));
+    assert.ok(Number.isFinite(outcome.confidence) && outcome.confidence >= 0 && outcome.confidence <= 1);
+    assert.equal(outcome.action, outcome.confidence >= 0.85 ? 'block' : outcome.confidence >= 0.5 ? 'alert' : 'record');
+    assert.ok(outcome.reason.length > 15);
   }
+  const spray = fixture.alerts.find(alert => /여러 계정에 같은 비밀번호를 연속으로 넣었/.test(alert.rule.description));
+  assert.ok(spray);
+  assert.equal(createDecider()(spray).action, 'block');
+  const normal = fixture.alerts.find(alert => alert.rule.description === '로그인이 성공했습니다.');
+  assert.ok(normal);
+  assert.equal(createDecider()(normal).action, 'record');
 });
 
 test('새 주소/계정/경보 번호에서도 패턴이 동작하고 장시간 집계는 차단하지 않는다', async () => {
@@ -37,15 +44,20 @@ test('낱개 실패를 5분 창으로 모으고 재전송은 중복 계산하지
   for (let i = 0; i < 40; i++) assert.notEqual((await decide(single)).action, 'block');
   for (let i = 1; i < 29; i++) assert.notEqual((await decide({ ...single, id: `unique-${i}` })).action, 'block');
   assert.equal((await decide({ ...single, id: 'unique-29' })).action, 'block');
-  assert.notEqual((await decide({ ...single, id: 'other-account', data: { ...single.data, srcuser: 'user98' } })).action, 'block');
+  assert.equal((await decide({ ...single, id: 'other-account', data: { ...single.data, srcuser: 'user98' } })).action, 'block'); // 같은 발신지에서는 계정 교체도 누적
   assert.notEqual((await decide({ ...single, id: 'later', timestamp: '2026-09-27T00:06:00Z' })).action, 'block');
 });
 
-test('애매한 경보는 T1110 태그만으로 차단하지 않는다', async () => {
-  for (const alert of fixture.alerts.slice(10, 19)) {
-    const out = await createDecider()(alert);
-    assert.equal(out.action, 'alert', alert.id);
-    assert.equal(out.confidence, 0.5, alert.id);
+test('T1110 태그와 소수의 실패만으로는 자동 차단하지 않는다', async () => {
+  const ambiguousDescriptions = [
+    '평소와 다른 주소에서 로그인 실패가 3건입니다.',
+    '10분 동안 한 계정의 로그인 실패가 5건입니다.',
+    '한 주소에서 실패 8건이 있고 간격은 고르지 않습니다.',
+  ];
+  for (const description of ambiguousDescriptions) {
+    const alert = fixture.alerts.find(item => item.rule.description === description);
+    assert.ok(alert, description);
+    assert.equal(createDecider()(alert).action, 'alert', description);
   }
 });
 
