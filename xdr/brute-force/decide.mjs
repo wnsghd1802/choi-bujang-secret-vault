@@ -1,7 +1,81 @@
-import { readFileSync } from 'node:fs';
-import { readAlert, digest } from './read-alerts.mjs';
+export const patterns = {
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "brute-force",
+  "mitre": "T1110",
+  "windowSeconds": 300,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    {
+      "name": "rapid-same-source-failures",
+      "condition": "짧은 시간 같은 출발 주소에서 로그인 실패가 반복되거나 연속으로 몰림",
+      "basis": "MITRE ATT&CK T1110/T1110.001은 반복적인 비밀번호 추측으로 인증 실패가 연속 발생하는 무차별 대입을 설명한다."
+    },
+    {
+      "name": "password-spray",
+      "condition": "같은 출발 주소에서 같은 비밀번호를 여러 계정에 반복 대입함",
+      "basis": "MITRE ATT&CK T1110.003은 하나 또는 소수의 비밀번호를 여러 계정에 시도하는 Password Spraying을 정의한다."
+    }
+  ]
+};
 
-export const patterns = JSON.parse(readFileSync(new URL('./patterns.json', import.meta.url), 'utf8'));
+// This module is deliberately self-contained. The XDR judge loads ONLY this file
+// in a network- and file-system-isolated JavaScript runtime.
+const isIP = value => {
+  if (typeof value !== 'string' || value.length > 45) return false;
+  if (!value.includes(':')) {
+    const octets = value.split('.');
+    return octets.length === 4 && octets.every(part =>
+      /^(?:0|[1-9][0-9]{0,2})$/u.test(part) && Number(part) <= 255);
+  }
+  // IPv6, including compressed addresses. Reject malformed hextets and excess groups.
+  if (!/^[0-9a-f:]+$/iu.test(value)) return false;
+  const chunks = value.split('::');
+  if (chunks.length > 2) return false;
+  const hextets = chunks.flatMap(chunk => chunk.split(':').filter(Boolean));
+  if (!hextets.every(part => /^[0-9a-f]{1,4}$/iu.test(part))) return false;
+  return chunks.length === 2 ? hextets.length < 8 : hextets.length === 8;
+};
+
+// Event IDs are kept only in memory for duplicate suppression; never logged.
+const digest = value => String(value);
+
+const SECRET_LIKE = [
+  /\bBearer\s+\S+/giu,
+  /(?:\b(?:password|passwd|pwd|secret|token|api[_-]?key)\b|비밀번호|암호|토큰)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+  /\beyJ[\w-]+\.[\w-]+\.[\w-]+\b/gu,
+  /\b(?:sk[-_]|sb_secret_)[\w-]+/gu,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
+  /[\w.+-]+@[\w.-]+\.[a-z]{2,}/giu,
+];
+
+const safeDescription = value => {
+  let text = typeof value === 'string' ? value : '';
+  for (const pattern of SECRET_LIKE) text = text.replace(pattern, '[REDACTED]');
+  return text.replace(/[\r\n\u0000-\u001f]/gu, ' ').slice(0, 500);
+};
+
+const safeAccount = value => {
+  const text = safeDescription(value);
+  return /[\w.+-]+@[\w.-]+\.[a-z]{2,}/iu.test(text) ? '[REDACTED]' : text;
+};
+
+const readAlert = alert => {
+  const rawTimestamp = alert?.timestamp ?? alert?.time ?? alert?.at;
+  const rawSource = alert?.data?.srcip ?? alert?.sourceAddress ?? alert?.sourceIp ?? alert?.srcip;
+  const rawAccount = alert?.data?.srcuser ?? alert?.account ?? alert?.srcuser ?? alert?.user ?? '';
+  const rawLevel = alert?.rule?.level ?? alert?.ruleLevel ?? alert?.level;
+  const rawDescription = alert?.rule?.description ?? alert?.description;
+  const level = Number(rawLevel);
+  return {
+    timestamp: typeof rawTimestamp === 'string' && Number.isFinite(Date.parse(rawTimestamp))
+      ? new Date(rawTimestamp).toISOString() : null,
+    sourceAddress: typeof rawSource === 'string' && isIP(rawSource) ? rawSource : null,
+    account: safeAccount(rawAccount),
+    ruleLevel: Number.isInteger(level) && level >= 0 && level <= 16 ? level : null,
+    description: safeDescription(rawDescription),
+  };
+};
+
 const RAPID = patterns.patterns.find(item => item.name === 'rapid-same-source-failures');
 const SPRAY = patterns.patterns.find(item => item.name === 'password-spray');
 
