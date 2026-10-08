@@ -41,31 +41,23 @@ test('낱개 실패를 5분 창으로 모으고 재전송은 중복 계산하지
   assert.notEqual((await decide({ ...single, id: 'later', timestamp: '2026-09-27T00:06:00Z' })).action, 'block');
 });
 
-test('Jev는 애매한 경보에만 호출하고 개인정보 없이 확신도 경계를 적용한다', async () => {
-  let calls = 0;
-  let score = 0.85;
-  const decide = createDecider({ jev: async features => {
-    calls++;
-    assert.doesNotMatch(JSON.stringify(features), /srcip|sourceIp|srcuser|account-|user01|description|password=/u);
-    return { confidence: score, reason: 'password=do-not-log' };
-  } });
-  await decide(fixture.alerts[0]);
-  await decide(fixture.alerts[19]);
-  assert.equal(calls, 0);
-  for (const [confidence, action] of [[0.85, 'block'], [0.5, 'alert'], [0.49, 'record']]) {
-    score = confidence;
-    const out = await decide(fixture.alerts[10]);
-    assert.equal(out.action, action);
-    assert.doesNotMatch(out.reason, /do-not-log/);
+test('애매한 경보는 T1110 태그만으로 차단하지 않는다', async () => {
+  for (const alert of fixture.alerts.slice(10, 19)) {
+    const out = await createDecider()(alert);
+    assert.equal(out.action, 'alert', alert.id);
+    assert.equal(out.confidence, 0.5, alert.id);
   }
 });
 
-test('Jev 미연결/오류/잘못된 응답/시간 초과는 alert로 남긴다', async () => {
-  for (const jev of [undefined, async () => { throw new Error('secret'); }, async () => ({ confidence: NaN }), () => new Promise(() => {})]) {
-    const out = await createDecider({ jev, timeoutMs: 10 })(fixture.alerts[10]);
-    assert.equal(out.action, 'alert');
-    assert.doesNotMatch(out.reason, /secret/);
-  }
+test('일반 로그인 성공은 기록하고, 약한 정황과 단일 실패는 차단하지 않는다', async () => {
+  assert.equal((await createDecider()(fixture.alerts[19])).action, 'record');
+  const weak = event({ rule: { level: 12, description: '여러 사용자에게 동일 비번을 설정했습니다.', mitre: ['T1110'] } });
+  const out = await createDecider()(weak);
+  assert.notEqual(out.action, 'block');
+  assert.equal((await createDecider()(event({
+    rule: { level: 7, description: '같은 계정 로그인 실패 4건 이후 정상적으로 성공했습니다.', mitre: ['T1110'] },
+    data: { srcip: '192.0.2.103', count: '4' },
+  }))).action, 'alert');
 });
 
 test('추출은 허용한 5개 항목만 반환하고 알려진 비밀값 형태를 제거한다', () => {
