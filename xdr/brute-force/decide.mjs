@@ -136,7 +136,8 @@ export function createDecider() {
     if (!suspicious) return decision(0.1, 'normal-event', '로그인 공격 패턴이 없어 기록만 남깁니다.');
 
     const candidate = f.samePassword && f.multiAccount ? SPRAY : RAPID;
-    return decision(0.5, candidate.name, '애매한 경보이므로 자동 차단하지 않고 알림으로 남깁니다.');
+    // 실험: 공격 가능성이 있는 경보도 차단합니다(정상 이벤트 예외는 위에서 처리).
+    return decision(0.85, candidate.name, '공격 가능성이 있어 실험적으로 차단합니다.');
   };
 }
 
