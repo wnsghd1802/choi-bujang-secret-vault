@@ -169,3 +169,5 @@ async function askJev(f, pattern, jev, timeoutMs) {
     clearTimeout(timer);
   }
 }
+
+export const decide = createDecider();
