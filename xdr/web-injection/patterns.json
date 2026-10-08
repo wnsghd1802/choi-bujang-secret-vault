@@ -1,0 +1,29 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "web-injection",
+  "mitre": "T1190",
+  "minimumRepeatCount": 5,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    {
+      "name": "sql-injection",
+      "condition": "SQL 구문이나 데이터베이스 조회를 웹 입력에 삽입하는 요청이 같은 출발지에서 반복됨",
+      "basis": "MITRE ATT&CK T1190은 공개된 애플리케이션 취약점 악용을 다루며 SQL 주입은 그 대표적인 웹 입력 악용 방식이다."
+    },
+    {
+      "name": "script-injection",
+      "condition": "스크립트 삽입 또는 실행 표식을 담은 웹 입력이 반복됨",
+      "basis": "MITRE ATT&CK T1190의 웹 애플리케이션 악용에는 공격자가 입력값에 삽입한 스크립트가 실행되는 XSS 형태가 포함된다."
+    },
+    {
+      "name": "path-traversal",
+      "condition": "상위 디렉터리 탐색 또는 경로 이탈 표식이 반복됨",
+      "basis": "MITRE ATT&CK T1190의 공개 애플리케이션 악용에는 경로 검증 부재를 이용한 디렉터리 이탈 시도가 해당할 수 있다."
+    },
+    {
+      "name": "command-injection",
+      "condition": "명령 구분자를 포함한 웹 입력 요청이 반복됨",
+      "basis": "MITRE ATT&CK T1190의 취약한 웹 애플리케이션 입력 처리는 운영체제 명령 주입의 진입점이 될 수 있다."
+    }
+  ]
+}
