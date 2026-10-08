@@ -114,7 +114,7 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
       && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10)));
     const clearIterativeGuess = f.failure && f.iterativeGuess && shortEnough && !f.successAfter && !explicitSingle
       && (f.count >= 8 || (f.count === 0 && f.ruleLevel >= 10));
-    const clearHighVolume = f.failure && shortEnough && !f.successAfter && !explicitSingle
+    const clearHighVolume = f.failure && shortEnough && !explicitSingle
       && f.count >= 20 && (f.ruleLevel >= 10 || f.noSuccess);
     const clearRegularMulti = f.failure && f.regular && f.accountCount >= 8 && !f.successAfter && !explicitSingle;
     const clearObserved = observedCount >= 30;
