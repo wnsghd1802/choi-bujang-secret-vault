@@ -39,7 +39,7 @@ export async function replay(root = fileURLToPath(new URL('../../', import.meta.
   const report = { mode: 'fixture-replay', alerts: fixture.alerts.length, extractedRows: rows.length,
     counts: result.counts, logEntriesAppended: logEntries, normalEvents: normalIds.size,
     normalBlockedIds, simulatedDenied,
-    integration: 'adapter-tested-only; production-engine-not-connected; Jev-not-connected' };
+    integration: 'adapter-tested-only; production-engine-not-connected; local-classification-only' };
   await writeFile(join(root, 'xdr', 'brute-force', 'replay-report.json'), `${JSON.stringify(report, null, 2)}\n`);
   await writeFile(join(root, 'xdr', 'brute-force', 'deny-rules.json'), `${JSON.stringify({
     mode: 'fixture-replay-only', simulatedAt: new Date(at).toISOString(), ruleCandidates,
