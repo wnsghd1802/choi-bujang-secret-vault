@@ -53,7 +53,7 @@ export function facts(alert) {
   const count = integer(alert?.data?.count ?? alert?.count ?? alert?.failureCount) || descriptionCount(text);
   const observedWindow = windowSeconds(text);
   const noSuccess = /성공(?:은|이)?\s*(?:없|없었)|성공\s*0|no\s*success/iu.test(text);
-  const successAfter = /(?:뒤에|후에)\s*성공|성공했습니다|성공했|성공함|로그인이\s*성공|정상\s*로그인|successful|succeeded/iu.test(text)
+  const successAfter = /(?:뒤에|후에|이후).{0,15}?성공|성공했습니다|성공했|성공함|로그인이\s*성공|정상\s*로그인|successful|succeeded/iu.test(text)
     && !noSuccess;
 
   return {
