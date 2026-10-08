@@ -69,8 +69,8 @@ export function facts(alert) {
   };
 }
 
-// Jev는 주입된 서버 콜백만 사용합니다. 주소·계정·원문은 보내지 않습니다.
-export function createDecider({ jev, timeoutMs = 1500 } = {}) {
+// 실험용: 패턴으로 판정하고 애매한 경보는 알림으로 남깁니다.
+export function createDecider() {
   const windows = new Map();
   let watermark = 0;
 
@@ -119,7 +119,7 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     const clearRegularMulti = f.failure && f.regular && f.accountCount >= 8 && !f.successAfter && !explicitSingle;
     const clearObserved = observedCount >= 30;
 
-    // 패턴으로 명확히 확인된 공격은 Jev를 호출하지 않고 확정 차단합니다.
+    // 패턴으로 명확히 확인된 공격만 확정 차단합니다.
     if (clearSpray) {
       return decision(1.0, SPRAY.name, '여러 계정에 같은 비밀번호를 반복 대입한 근거가 있습니다.');
     }
@@ -136,43 +136,8 @@ export function createDecider({ jev, timeoutMs = 1500 } = {}) {
     if (!suspicious) return decision(0.1, 'normal-event', '로그인 공격 패턴이 없어 기록만 남깁니다.');
 
     const candidate = f.samePassword && f.multiAccount ? SPRAY : RAPID;
-    if (typeof jev !== 'function') {
-      return decision(0.5, candidate.name, '애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다.');
-    }
-    return askJev(f, candidate, jev, timeoutMs);
+    return decision(0.5, candidate.name, '애매한 경보이므로 자동 차단하지 않고 알림으로 남깁니다.');
   };
-}
-
-async function askJev(f, pattern, jev, timeoutMs) {
-  let timer;
-  const controller = new AbortController();
-  try {
-    const response = await Promise.race([
-      Promise.resolve().then(() => jev({
-        ruleLevel: f.ruleLevel,
-        failureCount: f.count,
-        accountCount: f.accountCount,
-        t1110: f.t1110,
-        windowSeconds: f.windowSeconds,
-        failure: f.failure,
-        samePassword: f.samePassword,
-        regular: f.regular,
-      }, { signal: controller.signal })),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error('timeout'));
-        }, timeoutMs);
-      }),
-    ]);
-    const confidence = typeof response === 'number' ? response : response?.confidence;
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) throw new Error('invalid');
-    return decision(Number(confidence.toFixed(2)), pattern.name, 'Jev 확신도에 따른 보조 판단입니다.');
-  } catch {
-    return decision(0.5, pattern.name, 'Jev 응답 실패로 차단하지 않고 알림으로 남깁니다.');
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 export const decide = createDecider();
