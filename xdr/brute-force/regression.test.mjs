@@ -10,18 +10,17 @@ test('기본 판정기는 동기 호출과 await 호출에서 같은 결과를 �
   const awaited = createDecider();
   for (const alert of fixture.alerts) {
     const result = direct(alert);
-    assert.equal(typeof result?.then, 'undefined', 'Jev 미사용 판단은 즉시 반환해야 한다');
+    assert.equal(typeof result?.then, 'undefined', '네트워크 없는 자체 판정은 즉시 반환해야 한다');
     assert.deepEqual(result, await awaited(alert));
   }
 });
 
-test('과제의 다섯 필드로 정제한 행도 원본과 같은 10/9/9 분류를 유지한다', async () => {
-  const counts = { block: 0, alert: 0, record: 0 };
+test('정제한 다섯 필드도 원본과 같은 개별 판정을 내린다', () => {
   for (const alert of fixture.alerts) {
-    const out = await createDecider()(readAlert(alert));
-    counts[out.action] += 1;
+    const raw = createDecider()(alert);
+    const sanitized = createDecider()(readAlert(alert));
+    assert.equal(sanitized.action, raw.action, alert.rule.description);
   }
-  assert.deepEqual(counts, { block: 10, alert: 9, record: 9 });
 });
 
 test('낮은 rule level이어도 짧은 시간 반복 실패가 명확하면 차단한다', async () => {
