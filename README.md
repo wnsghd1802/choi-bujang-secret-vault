@@ -2,13 +2,11 @@
 
 ## 보너스 XDR-01 저장점
 
-`npm run xdr:run -- brute-force`로 무차별 로그인 경보 28건을 분류합니다. 공개 fixture 결과는 block 10 · alert 9 · record 9, 정상 block 0건입니다. 읽기 결과는 과제의 다섯 필드(timestamp/sourceAddress/account/ruleLevel/description)로 맞췄고, 패턴은 MITRE ATT&CK T1110 근거의 반복 로그인 실패와 password spray 두 개만 유지합니다. 명확한 공격은 rule level을 필수 조건으로 삼지 않고 행동 근거로 block하며, 행동 근거가 부족한 경보는 Jev 호출 없이 alert로 남깁니다. `node xdr/brute-force/replay.mjs`로 만료 시각과 실제 근거 경보 번호가 붙은 거부 후보 및 `xdr/alerts.log` 기록을 확인합니다.
+`npm run xdr:run -- brute-force`로 수업용 무차별 로그인 경보를 분류합니다. **기존 분류 건수는 정답이 아니며 유지 조건으로 사용하지 않습니다.** 행동 근거가 명확한 공격은 `block(1.0)`, 불충분한 의심은 `alert(0.5)`, 정상 활동은 `record(0.1)`로 판정합니다. 외부 판정 서비스 호출 없이 구현했으며 반복 로그인 실패와 Password Spraying을 탐지합니다. 단순 실패 횟수뿐 아니라 시간 범위, 시도 패턴, 계정 분산을 검사하고, 다량의 실패 뒤 성공한 사례도 자동으로 정상 처리하지 않습니다.
 
-재검증(2026-10-08): Node.js 22의 별도 재구성 작업 디렉터리에서 `npm run xdr:run -- brute-force`를 실행해 28건 중 block 10 · alert 9 · record 9, 정상 오차단 0건을 확인했습니다. 재생성된 `result.json`의 Git blob SHA는 `373ef81de4dc8ffae6566f613820b973a9d09b17`로 저장소의 현행 파일과 같아 해당 파일은 변경하지 않았습니다. 이는 로컬 공개 경보 검사 결과이며 비공개 심판 통과 판정이나 실제 운영 ZTNA 연결을 의미하지 않습니다.
+테스트: `node --test test/brute-force.test.mjs test/xdr-run.test.mjs xdr/brute-force/regression.test.mjs xdr/brute-force/evidence.test.mjs`. 추가 공격 문장, 의심·정상 사례, IP별 누적·중복 제거 및 실패 로그 검증 기준은 [XDR-01 검증 결과](xdr/brute-force/VALIDATION.md)를 참고하세요. 테스트 결과와 운영 심판 판정은 별개입니다.
 
-자세한 조건과 한계는 [XDR-01 안내](xdr/brute-force/README.md)를 봅니다. Jev와 실제 운영 ZTNA 엔진은 아직 연결되지 않았습니다. 현재 ZTNA 요청 계약에는 출발 IP가 없어 기존 판정기를 임의로 수정하지 않고 검증된 주소 공급자와 등록된 거부 응답을 받는 연결 부품을 제공했습니다. 로컬 시험은 실제 사이트 차단이나 심판 통과 증명이 아닙니다.
-
-확인 명령: `node --test test/stage2.test.mjs test/stage3.test.mjs test/stage5.test.mjs test/brute-force.test.mjs test/xdr-run.test.mjs xdr/brute-force/regression.test.mjs`. 이번 Windows 작업 환경의 기존 화면 빌드는 상위 폴더 읽기 권한 오류로 확인하지 못했습니다. 기존 자료실 코드·배포 설정·DB는 변경하지 않았습니다.
+`node xdr/brute-force/replay.mjs`로 로컬 모의 거부 후보와 만료 시각 및 근거 경보 ID를 확인할 수 있습니다. 실제 ZTNA 서버와 연결되어 있지는 않습니다. `docs/DECIDER_REQUEST.md`의 계약에 출발 IP가 없어 기존 판정기 계약을 임의로 수정하지 않았습니다. 기존 자료실 코드·배포 설정·DB는 변경하지 않았습니다.
 
 ## 현재 기능
 
