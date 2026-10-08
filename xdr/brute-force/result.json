@@ -66,55 +66,55 @@
       "alertId": "bf-11",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-12",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-13",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-14",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-15",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-16",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-17",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-18",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-19",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "rapid-same-source-failures: 애매한 경보이며 Jev 응답이 없어 알림으로 남깁니다."
+      "reason": "rapid-same-source-failures: 공격 정황은 있으나 자동 차단할 반복 근거가 부족합니다."
     },
     {
       "alertId": "bf-20",
