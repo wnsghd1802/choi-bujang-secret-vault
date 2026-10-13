@@ -7,6 +7,18 @@ permissions:
 jobs:
   audit-repro:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-isolated-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -16,3 +28,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node --test test/stage10-audit-isolation-repro.test.mjs
+      - name: Real isolated PostgreSQL 16 recovery/audit transaction
+        env:
+          PGPASSWORD: synthetic-isolated-only
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGDATABASE: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-postgres-setup.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/010-test-recovery.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/010-backup-reverification.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/011-immutable-stage10-history.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/012-stage10-evidence-permissions.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/013-stage10-audit-reverification.sql
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-postgres-integrity.sql
