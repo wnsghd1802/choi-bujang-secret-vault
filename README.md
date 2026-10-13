@@ -1,3 +1,12 @@
+## 독립 심판 감사 기록 조회 권한 검증 (2026-10-13)
+
+- **관측:** 처음부터 설치한 PostgreSQL에서 `service_role`은 `test_recovery_audit`에 INSERT만 명시적으로 부여받습니다. 013 복구 함수는 감사 `event_id`를 다시 SELECT해 검증하므로 독립 DB에서 해당 권한이 없으면 실패할 수 있습니다. 우리 Supabase에는 SELECT가 이미 있어서 기존 검증으로 드러나지 않았습니다.
+- **최소 수정:** 최초 설치 파일 `migrations/010-test-recovery.sql`에서 `service_role`에 감사 테이블 SELECT+INSERT를 명시하고, 기존 설치 갱신용 `migrations/013-stage10-audit-reverification.sql`에도 SELECT 권한 부여를 추가했습니다. `anon`·`authenticated`에는 권한을 부여하지 않았습니다. 운영 메모와 기존 감사 기록, 1~9단계 정책은 변경하지 않습니다.
+- **독립 검증:** 실제 PostgreSQL 16에서 별도 보정 GRANT 없이 010→011→012→013 설치 후 정상 B 복구/감사 추가, B 감사 INSERT 억제 시 전체 트랜잭션 롤백, A 및 기존 감사 기록 보존을 확인했습니다. 실험 기록: https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38398239010
+- **주의:** 이것은 확인된 권한 불일치에 대한 보완이며 심판의 비공개 `S10_AUDIT_DROPPED` 원인을 확정한 것은 아닙니다. 실제 심판 점수는 아직 재판정하지 않았습니다.
+
+---
+
 ## 10단계 감사 기록 검증 보강 (2026-10-13)
 
 - 심판의 최신 판정은 **이번 48점**, 실패 항목은 `S10_AUDIT_DROPPED` 한 가지입니다. 이전 36점 판정에서 지적됐던 `S10_BACKUP_UNVERIFIED`는 이번 실패 목록에 나타나지 않았습니다.

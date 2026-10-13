@@ -31,7 +31,7 @@ create table if not exists public.test_recovery_audit (
 );
 alter table public.test_recovery_audit enable row level security;
 revoke all on public.test_recovery_audit from public, anon, authenticated;
-grant insert on public.test_recovery_audit to service_role;
+grant select, insert on public.test_recovery_audit to service_role;
 
 create or replace function public.create_test_note_with_backup(
   p_id uuid, p_owner_id uuid, p_run_id uuid,
