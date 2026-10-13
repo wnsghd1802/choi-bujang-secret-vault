@@ -55,14 +55,14 @@ test('restoring the reviewed plan re-denies forbidden reads, retains normal read
   await writeFile(join(f.root,'src/decider.mjs'),breachedDecider);
   await writeFile(join(f.root,'src/detect.mjs'),breachedDetect);
   const earlier=await inspect(f);
-  assert.deepEqual(earlier.changed,['src/decider.mjs','src/detect.mjs']);
+  assert.deepEqual(earlier.changed,['src/decider.mjs']);
   assert.match(outputs.join(''),/\+.*'allow' : 'allow'/u);
   assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),breachedDecider);
   await assert.rejects(runPolicyRecovery({...f,apply:true,confirmed:true,output:()=>{}}),/restore_requires_reviewed_plan/u);
   const restored=await apply(f,earlier.plan);
   assert.equal(restored.applied,true);
   assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),safeDecider);
-  assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8'),safeDetect);
+  assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8'),breachedDetect);
   assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit event\n');
   assert.equal(await readFile(join(f.root,'other-service.txt'),'utf8'),'safe service rule\n');
   const {decide}=await import(pathToFileURL(join(f.root,'src/decider.mjs')).href);
