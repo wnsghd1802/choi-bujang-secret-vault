@@ -213,3 +213,54 @@ test('pre-existing judge B note restores from a verified private pre-attack copy
   assert.equal(db.audits.length,2);
   assert.equal(db.audits[1].restored_sha256,backup.content_sha256);
 });
+
+test('preseeded judge B snapshot under verified token sub restores without changing other notes',async()=>{
+  const db=fakeDb(),bToken=await issue('b'),aToken=await issue('a');
+  const ownerFromToken=(await verifyLogin('Bearer '+bToken)).userId;
+  assert.notEqual(ownerFromToken,noteOwnerId(await verifyLogin('Bearer '+bToken)));
+  const original={id:B_ID,owner_id:ownerFromToken,title:'B verified prior state',
+    content:'pre-attack verified B data'};
+  db.notes.set(B_ID,{...original,content:'attacker-changed B'});
+  db.backups.set(B_ID,{...original,run_id:RUN,identity:'b',
+    content_sha256:contentDigest(original.content)});
+  const aNote={id:A_ID,owner_id:noteOwnerId(await verifyLogin('Bearer '+aToken)),
+    title:'Account A',content:'A unchanged'};
+  db.notes.set(A_ID,{...aNote});
+  db.audits.push({note_id:A_ID,restored_sha256:'existing evidence'});
+  const restore=createRecoveryHandler({db,verifyLogin});
+  const denied=response();
+  await restore(request('POST','/api/restore',aToken,{id:B_ID}),denied);
+  assert.equal(denied.code,403);
+  const result=response();
+  await restore(request('POST','/api/restore',bToken,{id:B_ID}),result);
+  assert.equal(result.code,200);
+  assert.deepEqual(db.notes.get(B_ID),original);
+  assert.deepEqual(db.notes.get(A_ID),aNote);
+  assert.equal(db.audits.length,2);
+  assert.equal(db.audits[0].restored_sha256,'existing evidence');
+});
+
+test('legacy owner compatibility rejects B snapshot without signed-run match',async()=>{
+  const db=fakeDb(), token=await issue('b');
+  const body='pre-attack B';
+  db.notes.set(B_ID,{id:B_ID,owner_id:USER,title:'attacked',content:'corrupted'});
+  db.backups.set(B_ID,{id:B_ID,owner_id:USER,run_id:OTHER_RUN,identity:'b',
+    title:'safe',content:body,content_sha256:contentDigest(body)});
+  const result=response();
+  await createRecoveryHandler({db,verifyLogin})(request('POST','/api/restore',token,{id:B_ID}),result);
+  assert.equal(result.code,404);
+  assert.equal(db.audits.length,0);
+  assert.equal(db.notes.get(B_ID).content,'corrupted');
+});
+
+test('legacy owner compatibility rejects an unverified foreign owner and never creates a backup',async()=>{
+  const db=fakeDb(),token=await issue('b');
+  db.notes.set(B_ID,{id:B_ID,owner_id:A_ID,title:'attacked',content:'corrupt'});
+  db.backups.set(B_ID,{id:B_ID,owner_id:A_ID,run_id:RUN,identity:'b',
+    title:'old',content:'safe',content_sha256:contentDigest('safe')});
+  const res=response();
+  await createRecoveryHandler({db,verifyLogin})(request('POST','/api/restore',token,{id:B_ID}),res);
+  assert.equal(res.code,404);
+  assert.equal(db.audits.length,0);
+  assert.equal(db.notes.get(B_ID).content,'corrupt');
+});

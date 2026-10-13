@@ -1,0 +1,19 @@
+name: Stage10 owner mapping compatibility probe
+on:
+  push:
+    branches: [stage10-legacy-b-owner-probe]
+permissions:
+  contents: read
+jobs:
+  stage10-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:10
+      - run: node --test test/step8-judge-isolation.test.mjs test/step9.test.mjs
