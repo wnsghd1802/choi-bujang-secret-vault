@@ -1,3 +1,14 @@
+## 10단계 감사 기록 영수증: RPC와 HTTP 응답으로 확인 (2026-10-14)
+
+- 48/100점에서 `S10_AUDIT_DROPPED` 반복, **이번 변경 후 심판 판정은 미확인**.
+- 재현된 문제: 기존 `POST /api/restore`는 모의 DB가 메모 복구만 성공시키고 감사 기록을 저장하지 않아도 `200`으로 응답할 수 있었습니다. API 응답에 감사 기록의 식별자나 존재 확인값이 없어 HTTP만 보는 호출자는 보존을 확인할 수 없었습니다.
+- 추가한 `migrations/015-stage10-atomic-audit-receipt.sql`은 **새 함수** `public.restore_test_note_with_receipt(uuid,uuid,uuid,text)`만 생성하며 예전 복구 함수는 그대로 보존합니다. 정확히 한 메모를 검증·복구하고 같은 트랜잭션에서 감사 기록을 INSERT·재조회한 뒤 `audit_event_id`를 반환합니다. 감사 INSERT가 실패하거나 억제되면 메모 복구도 롤백합니다. 서버 역할 외 실행 권한은 부여하지 않습니다.
+- `src/recovery-api.mjs`은 새 RPC가 반환한 실제 양수 이벤트 ID를 검증한 경우에만 HTTP 200과 `auditRecorded: true`, `auditEventId`(문자열)를 추가 반환합니다. 공개 감사 목록이나 비밀 메모 본문은 노출하지 않습니다.
+- 검증: [수정 전 실패 재현](https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38430449198), [수정 후 격리 PostgreSQL 16 및 1~9단계 회귀](https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38431228043). 실제 Supabase에서도 가상 A/B 메모·기존 감사 이벤트를 `BEGIN ... ROLLBACK`으로 시험한 후 메모 8건, 시험 백업 0건, 감사 0건을 보존했습니다.
+- 한계: **심판이 실제로 감사 영수증 응답을 확인하는지, 학생 API가 아닌 별도 평가 경로를 사용하는지는 알 수 없습니다.** 자체 테스트를 심판 통과라고 해석하지 않습니다. 이전 48점 기준 `f874960`은 보존 브랜치에 유지합니다.
+
+---
+
 ## 10단계 — 복구 경로 독립 판정기 호환성 시험 (2026-10-14)
 
 - 최신 판정: 커밋 `ab80cfd` **이번 36점**, 최고 48점, `S10_AUDIT_DROPPED`. 이 새 변경의 실제 심판 점수는 아직 알 수 없습니다.

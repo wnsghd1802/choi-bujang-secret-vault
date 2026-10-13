@@ -48,14 +48,14 @@ function fakeDb(){
           backups.set(row.id,{...row,run_id:p.p_run_id,identity:'b',content_sha256:p.p_hash});
           return {error:null,data:[row]};
         }
-        if(name==='restore_test_note_from_backup'){
+        if(name==='restore_test_note_with_receipt'){
           const copy=backups.get(p.p_id),present=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
             || copy.content_sha256!==p.p_hash || copy.content_sha256!==contentDigest(copy.content)
             || (present && present.owner_id!==copy.owner_id))return {error:{code:'blocked'},data:null};
           const row={id:copy.id,owner_id:copy.owner_id,title:copy.title,content:copy.content};
-          notes.set(copy.id,row);audit.push({id:copy.id});
-          return {error:null,data:[row]};
+          notes.set(copy.id,row);audit.push({id:copy.id,event_id:audit.length+1});
+          return {error:null,data:[{...row,audit_event_id:audit.length}]};
         }
         throw Error('unexpected rpc');
       }};
@@ -143,7 +143,7 @@ test('backup changed after first API read but before database restore cannot mod
   const db=fakeDb();await createB(db);
   const originalRpc=db.rpc.bind(db);
   db.rpc=(name,args)=>{
-    if(name==='restore_test_note_from_backup'){
+    if(name==='restore_test_note_with_receipt'){
       // Simulates an attacker changing the snapshot between API check and RPC.
       db.backups.get(B_ID).content='corrupt during verification';
     }
@@ -164,7 +164,7 @@ test('backup changed on the API second read prevents all writes and preserves au
   const originalRpc=db.rpc.bind(db);
   let restoreCalls=0;
   db.rpc=(name,args)=>{
-    if(name==='restore_test_note_from_backup')restoreCalls++;
+    if(name==='restore_test_note_with_receipt')restoreCalls++;
     return originalRpc(name,args);
   };
   const from=db.from.bind(db);
@@ -248,4 +248,34 @@ test('stage10 fresh DB migrations create backup tables before verification hotfi
   const files=(await readdir(new URL('../migrations/',import.meta.url)))
     .filter(name=>/^010-.*\.sql$/u.test(name)).sort();
   assert.deepEqual(files,['010-test-recovery.sql','010-verify-backup.sql']);
+});
+
+test('HTTP 200 restore exposes a real persisted audit receipt identifier',async()=>{
+ const db=fakeDb();await createB(db);
+ db.notes.get(B_ID).content='attacker change';
+ const res=await restore(db);
+ assert.equal(res.code,200);
+ assert.equal(db.audit.length,1);
+ assert.match(String(res.body.auditEventId??''),/^[1-9][0-9]*$/u,
+   'successful restore must provide the durable audit event id');
+ assert.equal(res.body.auditRecorded,true);
+});
+
+test('never accept a note-only RPC response that lacks audit persistence receipt',async()=>{
+ const db=fakeDb();await createB(db);
+ db.notes.get(B_ID).content='attacked';
+ const originalRpc=db.rpc.bind(db);
+ db.rpc=(name,args)=>{
+   if(name==='restore_test_note_with_receipt'||name==='restore_test_note_with_receipt'){
+      const safe=db.backups.get(B_ID);
+      return {async abortSignal(){
+        return {error:null,data:[{id:safe.id,owner_id:safe.owner_id,title:safe.title,content:safe.content}]};
+      }};
+   }
+   return originalRpc(name,args);
+ };
+ const response=await restore(db);
+ assert.equal(response.code,409,'missing receipt must not get HTTP 200');
+ assert.equal(db.audit.length,0);
+ assert.equal(db.notes.get(B_ID).content,'attacked');
 });

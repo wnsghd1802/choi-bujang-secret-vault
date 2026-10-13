@@ -67,7 +67,7 @@ function fakeDb() {
           backups.set(row.id,backup);
           return {data:[{...row}],error:null};
         }
-        if(name==='restore_test_note_from_backup'){
+        if(name==='restore_test_note_with_receipt'){
           const copy=backups.get(p.p_id),existing=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
               || copy.identity!=='b' || copy.content_sha256!==p.p_hash
@@ -77,8 +77,8 @@ function fakeDb() {
           }
           const restored={id:copy.id,owner_id:copy.owner_id,title:copy.title,content:copy.content};
           notes.set(copy.id,restored);
-          audits.push({note_id:copy.id,run_id:copy.run_id,restored_sha256:copy.content_sha256});
-          return {data:[{...restored}],error:null};
+          audits.push({note_id:copy.id,run_id:copy.run_id,restored_sha256:copy.content_sha256,event_id:audits.length+1});
+          return {data:[{...restored,audit_event_id:audits.length}],error:null};
         }
         throw new Error('Unexpected RPC');
       }};
