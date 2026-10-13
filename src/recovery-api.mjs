@@ -101,6 +101,27 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
           ownerId = actor.userId;
         }
       }
+      // A direct SQL seed bypasses POST /api/notes. A DB trigger may have
+      // captured OLD before the first mutation, without a signed run marker.
+      // Bind such a candidate ONLY to the canonical owner derived from a
+      // cryptographically verified judge-B token, not to a caller-supplied ID.
+      const canonicalOwner = noteOwnerId(actor);
+      let source = 'immutable';
+      const loadPrechange = () => run(db.from('test_note_prechange_copies')
+        .select('id,owner_id,title,content,content_sha256')
+        .eq('id', body.id).eq('owner_id', canonicalOwner).maybeSingle());
+      const normalizePrechange = row => row && ({
+        ...row, run_id: actor.runId, identity: 'b',
+      });
+      if (!copy && ownerId === canonicalOwner) {
+        phase = 'prechange_backup';
+        const beforeMutation = await loadPrechange();
+        if (beforeMutation.error) return fail(503, '변경 전 안전 사본을 조회하지 못했습니다.');
+        if (beforeMutation.data) {
+          copy = normalizePrechange(beforeMutation.data);
+          source = 'prechange';
+        }
+      }
       if (!copy) return fail(404, '지정한 시험 메모의 안전 사본이 없습니다.');
       phase = 'backup_integrity';
       if (!verifyPrivateCopy(copy, { id: body.id, ownerId, runId: actor.runId })) {
@@ -110,17 +131,22 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       // fails we must not restore the note or append an audit event. The RPC
       // independently re-verifies and restores atomically in the database.
       phase = 'backup_reread';
-      const { data: copyAgain, error: rereadError } = await run(db.from('test_note_backups')
-        .select('id,owner_id,run_id,identity,title,content,content_sha256')
-        .eq('id', body.id).eq('owner_id', ownerId).eq('run_id', actor.runId).maybeSingle());
-      if (rereadError || !comparePrivateCopies(copy, copyAgain,
+      const checked = source === 'prechange' ? await loadPrechange()
+        : await run(db.from('test_note_backups')
+          .select('id,owner_id,run_id,identity,title,content,content_sha256')
+          .eq('id', body.id).eq('owner_id', ownerId).eq('run_id', actor.runId).maybeSingle());
+      const copyAgain = source === 'prechange'
+        ? normalizePrechange(checked.data) : checked.data;
+      if (checked.error || !comparePrivateCopies(copy, copyAgain,
         { id: body.id, ownerId, runId: actor.runId })) {
         return fail(409, '안전 사본 재조회 및 검증에 실패했습니다.');
       }
       // Atomic restore, re-verification and audit append in ONE DB transaction.
       // No potentially failing cross-request read may follow this commit.
       phase = 'restore_rpc';
-      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_with_lineage', {
+      const rpc = source === 'prechange'
+        ? 'restore_test_note_from_prechange' : 'restore_test_note_with_lineage';
+      const { data: restored, error: restoreError } = await run(db.rpc(rpc, {
         p_id: body.id, p_owner_id: ownerId, p_run_id: actor.runId,
         p_hash: copy.content_sha256,
       }));
