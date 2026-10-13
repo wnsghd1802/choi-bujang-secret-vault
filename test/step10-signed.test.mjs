@@ -170,3 +170,52 @@ test('different run cannot steal B recovery; corrupted backup blocks all writes 
   assert.equal(db.audits.length,0);
   assert.equal(db.notes.get(B_ID).content,'tampered content');
 });
+
+test('independent judge fixture without student Supabase keys restores B only', async()=>{
+  // No student service key, production Vercel, remote JWKS or real Supabase data.
+  const db=fakeDb();
+  const keys=createLocalJWKSet({keys:[jwk]});
+  const independentEnv={SUPABASE_URL:'https://isolated-judge-fixture.supabase.co'};
+  const bToken=await issue('b');
+  const aToken=await issue('a');
+  const judgeOnly=createLoginVerifier({config,judgeKeySet:keys});
+  assert.equal((await judgeOnly('Bearer '+bToken))?.identity,'b');
+  assert.equal(await judgeOnly('Bearer '+await issue('b',RUN,rogue.privateKey)),null);
+  const create=createNotesHandler({db,env:independentEnv,judgeKeySet:keys});
+  const note=response();
+  await create(request('POST','/api/notes',bToken,{id:B_ID,title:'B isolated',body:'synthetic original'}),note);
+  assert.equal(note.code,201);
+  assert.equal(db.backups.size,1);
+  db.notes.get(B_ID).content='tampered independently';
+  const recover=createRecoveryHandler({db,env:independentEnv,judgeKeySet:keys});
+  const denied=response();
+  await recover(request('POST','/api/restore',aToken,{id:B_ID}),denied);
+  assert.equal(denied.code,403);
+  const success=response();
+  await recover(request('POST','/api/restore',bToken,{id:B_ID}),success);
+  assert.equal(success.code,200);
+  assert.equal(db.notes.get(B_ID).content,'synthetic original');
+  assert.equal(db.audits.length,1);
+  assert.equal(db.audits[0].restored_sha256,contentDigest('synthetic original'));
+});
+
+test('independent DB configuration cannot authenticate student tokens via unrelated key',async()=>{
+  const fixtureEnv={
+    SUPABASE_URL:'https://isolated-judge-fixture.supabase.co',
+    SUPABASE_SECRET_KEY:'synthetic-fixture-service-key',
+  };
+  const db=fakeDb(), keys=createLocalJWKSet({keys:[jwk]});
+  const create=createNotesHandler({db,env:fixtureEnv,judgeKeySet:keys});
+  const fakeStudentJwt=await issue('b');
+  const b=response();
+  await create(request('POST','/api/notes',fakeStudentJwt,
+    {id:B_ID,title:'B from isolated env',body:'synthetic'}),b);
+  assert.equal(b.code,201,'isolated judge token must be independently verified');
+  const isolatedVerifier=createLoginVerifier({config,judgeKeySet:keys});
+  assert.equal(await isolatedVerifier('Bearer malformed.jwt.value'),null);
+  const bad=response();
+  await create(request('POST','/api/notes','malformed.jwt.value',
+    {id:A_ID,title:'blocked',body:'blocked'}),bad);
+  assert.equal(bad.code,401);
+  assert.equal(db.notes.size,1);
+});

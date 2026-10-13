@@ -11,7 +11,7 @@ const fields = 'id,title,content';
 const view = row => ({ id: row.id, title: row.title, body: row.content });
 
 export function createNotesHandler({ item = false, env = process.env, db: suppliedDb,
-  verifyLogin: suppliedVerifier } = {}) {
+  verifyLogin: suppliedVerifier, judgeKeySet } = {}) {
   let db = suppliedDb;
   let verifyLogin = suppliedVerifier;
   return async (req, res) => {
@@ -24,10 +24,14 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
     let actor;
     try {
       if (!verifyLogin) {
-        if (env.SUPABASE_URL !== new URL(config.identityProvider.issuer).origin || !env.SUPABASE_SECRET_KEY) {
+        if (!suppliedDb && (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY)) {
           return fail(503, '서버 로그인 설정을 확인해 주세요.');
         }
-        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: env.SUPABASE_SECRET_KEY });
+        // The judge may use its own isolated database. Bind student auth only
+        // to the configured student issuer: never send an isolated DB key there.
+        const studentKey = env.SUPABASE_URL === new URL(config.identityProvider.issuer).origin
+          ? env.SUPABASE_SECRET_KEY : undefined;
+        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: studentKey, judgeKeySet });
       }
       actor = await verifyLogin(authorization);
     } catch { return fail(503, '로그인 확인을 완료하지 못했습니다.'); }
