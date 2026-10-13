@@ -41,8 +41,9 @@ function fakeDb() {
   const notes=new Map(), backups=new Map(), audits=[];
   return {notes,backups,audits,
     from(table) {
-      assert.ok(['notes','test_note_backups'].includes(table));
-      const rows = table === 'notes' ? notes : backups;
+      assert.ok(['notes','test_note_backups','test_note_prechange_copies'].includes(table));
+      const rows = table === 'notes' ? notes
+        : table === 'test_note_backups' ? backups : new Map();
       const conditions=[];
       let one=false;
       const q={
