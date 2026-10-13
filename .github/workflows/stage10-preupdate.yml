@@ -1,0 +1,20 @@
+name: Stage10 pre-update backup regression (isolated)
+on:
+  push:
+    branches: [stage10-preupdate-safe-copy]
+permissions:
+  contents: read
+jobs:
+  b-preupdate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run test:10
+      - name: Previous 1-9 test contracts
+        if: always()
+        run: node --test test/stage3.test.mjs test/stage4.test.mjs test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs

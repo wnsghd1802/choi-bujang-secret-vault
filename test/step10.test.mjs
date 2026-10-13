@@ -249,3 +249,31 @@ test('stage10 fresh DB migrations create backup tables before verification hotfi
     .filter(name=>/^010-.*\.sql$/u.test(name)).sort();
   assert.deepEqual(files,['010-test-recovery.sql','010-verify-backup.sql']);
 });
+
+test('RED: a preseeded judge-B note gets a trusted pre-mutation snapshot on its first PUT',async()=>{
+  const db=fakeDb(),original={id:B_ID,owner_id:noteOwnerId(B),
+    title:'Pre-existing B',content:'real safe content before attack'};
+  const unrelated={id:A_ID,owner_id:noteOwnerId(A),title:'A data',content:'unchanged A'};
+  db.notes.set(B_ID,{...original});
+  db.notes.set(A_ID,{...unrelated});
+  db.audit.push({id:A_ID,marker:'past audit'});
+  const earlierAudit=structuredClone(db.audit);
+  const responsePut=response();
+  await createNotesHandler({item:true,db,verifyLogin:async()=>B})({
+    method:'PUT',url:'/api/notes/'+B_ID,query:{id:B_ID},headers,
+    body:{title:'Attacked B',body:'payload inserted by simulated attacker'},
+  },responsePut);
+  assert.equal(responsePut.code,200);
+  assert.equal(db.notes.get(B_ID).content,'payload inserted by simulated attacker');
+  assert.equal(db.backups.get(B_ID)?.content,original.content,
+    'the original must be backed up atomically BEFORE the first authorized B modification');
+  assert.equal(db.backups.get(B_ID)?.content_sha256,contentDigest(original.content));
+  assert.deepEqual(db.notes.get(A_ID),unrelated);
+  assert.deepEqual(db.audit,earlierAudit);
+  const restored=await restore(db);
+  assert.equal(restored.code,200);
+  assert.deepEqual(db.notes.get(B_ID),original);
+  assert.deepEqual(db.notes.get(A_ID),unrelated);
+  assert.deepEqual(db.audit[0],earlierAudit[0]);
+  assert.equal(db.audit.length,2);
+});
