@@ -18,6 +18,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Verify stage 9 policy checkpoint (read-only)
+        run: npm run policy:check
       - run: npm run test:10
       - run: npm run decider:test
       - run: npm run detect:test
