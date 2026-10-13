@@ -70,6 +70,6 @@ test('unreviewed committed additions cannot be silently reclassified as safe',as
  const plan=await runPolicyRecovery({...f,output:()=>{}});
  await assert.rejects(runPolicyRecovery({...f,apply:true,confirmed:true,
    expectedPlan:plan.plan,output:()=>{}}),/policy_head_contains_unreviewed_changes/u);
- assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8',committed+'\n// attacker worktree\n');
+ assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),committed+'\n// attacker worktree\n');
  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit before attack\n');
 });
