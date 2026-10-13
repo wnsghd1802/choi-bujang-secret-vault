@@ -52,4 +52,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f migrations/013-stage10-audit-reverification.sql
           psql -v ON_ERROR_STOP=1 -f migrations/015-stage10-atomic-audit-receipt.sql
           psql -v ON_ERROR_STOP=1 -f migrations/016-stage10-b-row-lineage.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/017-stage10-lineage-write-gate.sql
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-lineage-authorization.sql
           psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-owner-id-matrix.sql
