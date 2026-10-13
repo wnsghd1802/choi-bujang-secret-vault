@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { runPolicyRecovery } from '../scripts/policy-recovery.mjs';
+import { runPolicyRecovery, reverifyStoredPolicySnapshot } from '../scripts/policy-recovery.mjs';
 
 const safeDecider = `export const RULE_IDS=['resource_zone'];
 export async function decide(request) {
@@ -109,4 +109,32 @@ test('restore skips an intact second policy rather than rewriting it',async t=>{
   const result=await apply(f,review.plan);
   assert.equal(result.applied,true);
   assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8'),safeDetect);
+});
+
+test('policy snapshot is read back and checked; altered/missing copies fail closed',async t=>{
+  const f=await fixture(t);
+  const snapshot=join(f.root,'previous-policy.before');
+  const original=Buffer.from(breachedDecider);
+  await writeFile(snapshot,original);
+  assert.match(await reverifyStoredPolicySnapshot(snapshot,original),/^[0-9a-f]{64}$/u);
+  await writeFile(snapshot,Buffer.from('attacker-corrupted-backup'));
+  await assert.rejects(reverifyStoredPolicySnapshot(snapshot,original),
+    /policy_snapshot_reverification_failed/u);
+  await rm(snapshot);
+  await assert.rejects(reverifyStoredPolicySnapshot(snapshot,original),{code:'ENOENT'});
+  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),safeDecider);
+  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit event\n');
+});
+
+test('policy preview shows both version identifiers and changed files before any apply',async t=>{
+  const f=await fixture(t);
+  await writeFile(join(f.root,'src/decider.mjs'),breachedDecider);
+  const lines=[];
+  const preview=await runPolicyRecovery({...f,output:line=>lines.push(line)});
+  assert.equal(preview.applied,false);
+  assert.match(lines.join(''),new RegExp(f.checkpoint,'u'));
+  assert.match(lines.join(''),/검증된 안전 정책 버전/u);
+  assert.match(lines.join(''),/현재 작업 버전/u);
+  assert.match(lines.join(''),/src\/decider\.mjs: 차이 있음/u);
+  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),breachedDecider);
 });

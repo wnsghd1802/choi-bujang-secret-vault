@@ -11,6 +11,23 @@ const git = (root, ...args) => execFileSync('git', args, {
   env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' },
 }).trim();
 
+// Stage-10 proof: read the durable pre-restore snapshot back from disk
+// before any policy bytes are replaced. An unverifiable snapshot is NOT a backup.
+export async function reverifyStoredPolicySnapshot(path, expected) {
+  if (typeof path !== 'string' || !Buffer.isBuffer(expected)) {
+    throw new TypeError('invalid_policy_snapshot_verification_input');
+  }
+  const details = await lstat(path);
+  if (!details.isFile() || details.isSymbolicLink()) {
+    throw new Error('policy_snapshot_not_regular_file');
+  }
+  const saved = await readFile(path);
+  if (!saved.equals(expected) || digest(saved) !== digest(expected)) {
+    throw new Error('policy_snapshot_reverification_failed');
+  }
+  return digest(saved);
+}
+
 async function atomicReplace(path, bytes, mode) {
   const temporary = join(dirname(path), `.aleph-restore-${randomUUID()}.tmp`);
   try {
@@ -40,6 +57,7 @@ export async function runPolicyRecovery({ root, checkpoint, apply = false,
   const safeToApply = status.every(entry => entry.length >= 4
     && entry[0] === ' ' && [' ', 'M'].includes(entry[1])
     && TARGETS.includes(entry.slice(3)));
+  output(`검증된 안전 정책 버전: ${checkpoint}\n현재 작업 버전: ${head}\n`);
   const entries = [];
   for (const path of TARGETS) {
     const filename = join(root, path);
@@ -78,7 +96,19 @@ export async function runPolicyRecovery({ root, checkpoint, apply = false,
   const backupDir = join(root, 'artifacts', 'policy-recovery', randomUUID());
   await mkdir(backupDir, { recursive: true });
   for (const e of changed) {
-    await writeFile(join(backupDir, e.path.replaceAll('/', '__') + '.before'), e.current, {flag:'wx',mode:0o600});
+    const savedPath = join(backupDir, e.path.replaceAll('/', '__') + '.before');
+    await writeFile(savedPath, e.current, {flag:'wx',mode:0o600});
+    // Fail closed: a missing, modified or unreadable saved copy MUST stop
+    // recovery before the first target policy mutation.
+    await reverifyStoredPolicySnapshot(savedPath, e.current);
+  }
+  // Re-read the trusted version from Git as well, rather than relying solely
+  // on the earlier preview's in-memory copy.
+  for (const e of entries) {
+    const verifiedAgain = execFileSync('git', ['show', `${checkpoint}:${e.path}`], {
+      cwd: root, timeout: 5000, maxBuffer: 1024 * 1024,
+    });
+    if (!verifiedAgain.equals(e.verified)) throw new Error('policy_verified_version_changed');
   }
   // Refuse stale approval if any policy changed after we computed the preview.
   for (const e of entries) {
