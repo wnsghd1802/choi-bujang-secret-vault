@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { describePolicyDiff } from './policy-diff.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CHECKPOINT = '98a9bc4f1b3131be97462e32cde2c52c19f7bbb5';
@@ -35,6 +36,10 @@ for (const path of TARGETS) {
 for (const item of checks) {
   process.stdout.write(`${item.path}: ${item.changed ? '차이 있음' : '안전 버전과 동일'} `
     + `(현재 SHA256 ${hash(item.current).slice(0,12)}, 안전 SHA256 ${hash(item.baseline).slice(0,12)})\n`);
+  // Show the exact changed lines BEFORE any file is replaced.
+  if (item.changed) process.stdout.write(await describePolicyDiff({
+    path: item.path, verified: item.baseline, current: item.current,
+  }));
 }
 if (!apply) {
   process.stdout.write('미적용: 읽기 전용 비교입니다. 복원 전 변경 범위를 검토하세요.\n');

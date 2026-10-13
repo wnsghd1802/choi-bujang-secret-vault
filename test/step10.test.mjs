@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { createRecoveryHandler } from '../src/recovery-api.mjs';
 import { createNotesHandler } from '../src/notes-api.mjs';
 import { noteOwnerId } from '../src/note-owner.mjs';
+import { describePolicyDiff } from '../scripts/policy-diff.mjs';
 import { contentDigest, verifyPrivateCopy } from '../src/recovery-core.mjs';
 
 const USER='11111111-1111-4111-8111-111111111111';
@@ -187,4 +188,26 @@ test('backup changed on the API second read prevents all writes and preserves au
   assert.equal(restoreCalls,0,'no restore transaction after failed backup re-read');
   assert.deepEqual(db.notes.get(B_ID),noteBefore);
   assert.deepEqual(db.audit,auditBefore);
+});
+
+test('unchanged verified policy produces no diff', async () => {
+  const snapshot = Buffer.from('safe policy\n');
+  assert.equal(await describePolicyDiff({ path:'src/decider.mjs',
+    verified:snapshot, current:snapshot }), '');
+});
+test('before a policy restore, the exact changed lines are reviewable', async () => {
+  const patch = await describePolicyDiff({ path:'src/detect.mjs',
+    verified:Buffer.from('return "deny";\n'),
+    current:Buffer.from('return "allow";\n') });
+  assert.match(patch, /^--- verified-stage9\/src\/detect\.mjs/mu);
+  assert.match(patch, /^\+\+\+ current\/src\/detect\.mjs/mu);
+  assert.match(patch, /^-return "deny";/mu);
+  assert.match(patch, /^\+return "allow";/mu);
+  assert.doesNotMatch(patch, /aleph-policy-diff-|\/tmp\//u);
+});
+test('policy diff refuses unexpected paths and invalid bytes', async () => {
+  await assert.rejects(describePolicyDiff({ path:'../secrets',
+    verified:Buffer.from('a'), current:Buffer.from('b') }), TypeError);
+  await assert.rejects(describePolicyDiff({ path:'src/decider.mjs',
+    verified:null, current:Buffer.from('b') }), TypeError);
 });
