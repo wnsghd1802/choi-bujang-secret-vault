@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
 import { requestHasOnlyResourceId } from './resource-zones.mjs';
 import { noteOwnerId } from './note-owner.mjs';
+import { contentDigest } from './recovery-core.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -88,6 +89,20 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
         return res.status(200).json(data.map(view));
       }
       if (req.method === 'POST') {
+        // Snapshot synthetic judge-B notes in the SAME database transaction as
+        // creation. No student data or judge-A data is copied or changed.
+        if (actor.kind === 'judge' && actor.identity === 'b') {
+          const { data, error } = await run(db.rpc('create_test_note_with_backup', {
+            p_id: id, p_owner_id: ownerId, p_run_id: actor.runId,
+            p_title: body.title.trim(), p_content: body.body,
+            p_hash: contentDigest(body.body),
+          }));
+          if (error?.code === '23505') return fail(409, '이미 사용 중인 메모 ID입니다.');
+          if (error || !Array.isArray(data) || data.length !== 1 || data[0].id !== id) {
+            throw new Error('private_test_snapshot_unavailable');
+          }
+          return res.status(201).json(view(data[0]));
+        }
         const { data, error } = await run(db.from('notes').insert({ id, title: body.title.trim(),
           content: body.body, owner_id: ownerId }).select(fields).single());
         if (error?.code === '23505') return fail(409, '이미 사용 중인 메모 ID입니다.');
