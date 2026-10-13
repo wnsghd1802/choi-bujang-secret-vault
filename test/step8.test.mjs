@@ -10,6 +10,7 @@ const B = '22222222-2222-4222-8222-222222222222';
 const ID = '33333333-3333-4333-8333-333333333333';
 const fixture = () => ({
   schema:'aleph.decision.v1', requestId:'test-8', deviceRegistered:true,
+  classId:'class_fixture',projectId:'project_fixture',subjectId:'learner_fixture',deviceId:'aaaaaaaaaaaaaaaa',
   service:'notes', method:'GET', path:'/notes/demo', route:'GET /notes/:id', queryLength:0,
   signals:{source:'judge_fixture', region:'local', network:'usual', hour:14},
   recentEvents:[],stepUp:{verified:false,authAgeSeconds:null},
@@ -46,8 +47,9 @@ test('strict route blocks id2, nested export and unknown routes',async()=>{
     {queryLength:1},
   ]) await outcome(edit,'deny');
 });
-test('own resource-shaped API routes delegate to server ownership check',async()=>{
-  await outcome({route:'PUT /api/notes/:id',method:'PUT',path:'/api/notes/'+ID},'allow');
+test('unverified item ID fails closed; own collection is server-scoped',async()=>{
+  await outcome({route:'PUT /api/notes/:id',method:'PUT',path:'/api/notes/'+ID},'deny');
+  await outcome({route:'GET /api/notes/:id',method:'GET',path:'/api/notes/'+ID},'deny');
   await outcome({route:'GET /api/notes',path:'/api/notes'},'allow');
 });
 test('7th stage composite anomaly retains step-up requirement',async()=>{
