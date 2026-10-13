@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
 import { noteOwnerId } from './note-owner.mjs';
+import { getServerDb } from './server-db-config.mjs';
 import { isValidRestoreId, verifyPrivateCopy, validateRestoredRow, comparePrivateCopies } from './recovery-core.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
@@ -45,9 +46,11 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
     try {
       let verifyLogin = suppliedVerifier;
       if (!verifyLogin) {
-        if (env.SUPABASE_URL !== new URL(config.identityProvider.issuer).origin
-            || !env.SUPABASE_SECRET_KEY) return fail(503, '서버 인증 설정을 확인해 주세요.');
-        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: env.SUPABASE_SECRET_KEY });
+        const dbConfig = getServerDb(env);
+        if (!dbConfig) return fail(503, '서버 인증 설정을 확인해 주세요.');
+        // The verified JWT issuer remains PINNED to config.issuer; a distinct
+        // server-side database endpoint does not relax judge-token checks.
+        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: dbConfig.secretKey });
       }
       phase = 'verify_identity';
       actor = await verifyLogin(authorization);
@@ -73,7 +76,9 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
 
 
     try {
-      const db = suppliedDb ?? createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+      const dbConfig = suppliedDb ? null : getServerDb(env);
+      if (!suppliedDb && !dbConfig) return fail(503, '서버 DB 설정을 확인해 주세요.');
+      const db = suppliedDb ?? createClient(dbConfig.url, dbConfig.secretKey, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
       const run = query => query.abortSignal(AbortSignal.timeout(8000));
