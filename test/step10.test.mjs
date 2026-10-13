@@ -48,14 +48,14 @@ function fakeDb(){
           backups.set(row.id,{...row,run_id:p.p_run_id,identity:'b',content_sha256:p.p_hash});
           return {error:null,data:[row]};
         }
-        if(name==='restore_test_note_from_backup'){
+        if(name==='restore_test_note_with_receipt'){
           const copy=backups.get(p.p_id),present=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
             || copy.content_sha256!==p.p_hash || copy.content_sha256!==contentDigest(copy.content)
             || (present && present.owner_id!==copy.owner_id))return {error:{code:'blocked'},data:null};
           const row={id:copy.id,owner_id:copy.owner_id,title:copy.title,content:copy.content};
-          notes.set(copy.id,row);audit.push({id:copy.id});
-          return {error:null,data:[row]};
+          notes.set(copy.id,row);audit.push({id:copy.id,event_id:audit.length+1});
+          return {error:null,data:[{...row,audit_event_id:audit.length}]};
         }
         throw Error('unexpected rpc');
       }};
@@ -143,7 +143,7 @@ test('backup changed after first API read but before database restore cannot mod
   const db=fakeDb();await createB(db);
   const originalRpc=db.rpc.bind(db);
   db.rpc=(name,args)=>{
-    if(name==='restore_test_note_from_backup'){
+    if(name==='restore_test_note_with_receipt'){
       // Simulates an attacker changing the snapshot between API check and RPC.
       db.backups.get(B_ID).content='corrupt during verification';
     }
@@ -164,7 +164,7 @@ test('backup changed on the API second read prevents all writes and preserves au
   const originalRpc=db.rpc.bind(db);
   let restoreCalls=0;
   db.rpc=(name,args)=>{
-    if(name==='restore_test_note_from_backup')restoreCalls++;
+    if(name==='restore_test_note_with_receipt')restoreCalls++;
     return originalRpc(name,args);
   };
   const from=db.from.bind(db);
@@ -266,7 +266,7 @@ test('never accept a note-only RPC response that lacks audit persistence receipt
  db.notes.get(B_ID).content='attacked';
  const originalRpc=db.rpc.bind(db);
  db.rpc=(name,args)=>{
-   if(name==='restore_test_note_from_backup'||name==='restore_test_note_with_receipt'){
+   if(name==='restore_test_note_with_receipt'||name==='restore_test_note_with_receipt'){
       const safe=db.backups.get(B_ID);
       return {async abortSignal(){
         return {error:null,data:[{id:safe.id,owner_id:safe.owner_id,title:safe.title,content:safe.content}]};

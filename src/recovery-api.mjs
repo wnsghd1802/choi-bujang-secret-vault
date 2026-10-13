@@ -120,18 +120,21 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       // Atomic restore, re-verification and audit append in ONE DB transaction.
       // No potentially failing cross-request read may follow this commit.
       phase = 'restore_rpc';
-      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_from_backup', {
+      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_with_receipt', {
         p_id: body.id, p_owner_id: ownerId, p_run_id: actor.runId,
         p_hash: copy.content_sha256,
       }));
+      const receipt = restored?.[0]?.audit_event_id;
       if (restoreError || !Array.isArray(restored) || restored.length !== 1
-          || !validateRestoredRow(restored[0], copy)) {
+          || !validateRestoredRow(restored[0], copy)
+          || !/^[1-9][0-9]*$/u.test(String(receipt ?? ''))) {
         return fail(409, '시험 메모 복구가 검증되지 않았습니다.');
       }
       phase = 'completed';
       trace('success', 200);
       return res.status(200).json({ id: copy.id, restored: true, verified: true,
-        contentSha256: copy.content_sha256 });
+        contentSha256: copy.content_sha256, auditRecorded: true,
+        auditEventId: String(receipt) });
     } catch {
       phase = 'db_exception';
       // Deliberately do not leak table contents, token details or DB diagnostics.

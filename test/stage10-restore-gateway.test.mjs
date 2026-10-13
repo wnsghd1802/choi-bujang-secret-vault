@@ -75,14 +75,14 @@ test('gateway-to-restore completes precisely one B restoration, preserving A, B2
      }};
    return q;
   },
-  rpc(name,params){assert.equal(name,'restore_test_note_from_backup');
+  rpc(name,params){assert.equal(name,'restore_test_note_with_receipt');
    return {async abortSignal(){
     if(params.p_id!==id||params.p_owner_id!==ownerB||params.p_run_id!==run||
        params.p_hash!==safe.content_sha256) return {data:null,error:{code:'wrong_target'}};
     const restored={id,owner_id:ownerB,title:safe.title,content:safe.content};
     notes.set(id,restored);
     audit.push({note_id:id,owner_id:ownerB,run_id:run,restored_sha256:safe.content_sha256});
-    return {data:[{...restored}],error:null};
+    return {data:[{...restored,audit_event_id:audit.length}],error:null};
    }};
   }
  };
