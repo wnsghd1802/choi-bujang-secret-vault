@@ -170,3 +170,46 @@ test('different run cannot steal B recovery; corrupted backup blocks all writes 
   assert.equal(db.audits.length,0);
   assert.equal(db.notes.get(B_ID).content,'tampered content');
 });
+
+test('pre-existing judge B note without a verified pre-attack snapshot must fail closed', async()=>{
+  const db=fakeDb(), bToken=await issue('b');
+  const actor=await verifyLogin('Bearer '+bToken);
+  db.notes.set(B_ID,{id:B_ID,owner_id:noteOwnerId(actor),
+    title:'pre-existing B',content:'already modified'});
+  db.audits.push({note_id:A_ID,restored_sha256:'older audit event'});
+  const beforeAudit=structuredClone(db.audits);
+  const restore=createRecoveryHandler({db,verifyLogin});
+  const result=response();
+  await restore(request('POST','/api/restore',bToken,{id:B_ID}),result);
+  assert.equal(result.code,404);
+  assert.equal(db.notes.get(B_ID).content,'already modified',
+    'never back up the possibly compromised live note during recovery');
+  assert.equal(db.backups.size,0);
+  assert.deepEqual(db.audits,beforeAudit,'no evidence may be rewritten or appended on failure');
+});
+
+test('pre-existing judge B note restores from a verified private pre-attack copy',async()=>{
+  const db=fakeDb(), bToken=await issue('b'), aToken=await issue('a');
+  const bActor=await verifyLogin('Bearer '+bToken);
+  const aActor=await verifyLogin('Bearer '+aToken);
+  const bOwner=noteOwnerId(bActor);
+  const original={id:B_ID,owner_id:bOwner,title:'B safe before attack',
+    content:'verified pre-attack snapshot'};
+  const backup={...original,run_id:RUN,identity:'b',
+    content_sha256:contentDigest(original.content)};
+  const aNote={id:A_ID,owner_id:noteOwnerId(aActor),title:'A untouched',content:'A content'};
+  db.notes.set(A_ID,{...aNote});
+  db.notes.set(B_ID,{...original,content:'attacker corruption'});
+  db.backups.set(B_ID,{...backup});
+  db.audits.push({note_id:A_ID,restored_sha256:'preserved existing audit'});
+  const restore=createRecoveryHandler({db,verifyLogin});
+  const result=response();
+  await restore(request('POST','/api/restore',bToken,{id:B_ID}),result);
+  assert.equal(result.code,200);
+  assert.deepEqual(db.notes.get(B_ID),original);
+  assert.deepEqual(db.notes.get(A_ID),aNote);
+  assert.deepEqual(db.backups.get(B_ID),backup);
+  assert.equal(db.audits[0].restored_sha256,'preserved existing audit');
+  assert.equal(db.audits.length,2);
+  assert.equal(db.audits[1].restored_sha256,backup.content_sha256);
+});
