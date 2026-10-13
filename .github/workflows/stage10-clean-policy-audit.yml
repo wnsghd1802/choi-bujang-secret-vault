@@ -1,0 +1,24 @@
+name: Stage10 clean policy/audit scope hypothesis
+on:
+  push:
+    branches: [stage10-policy-scope-clean-audit]
+permissions:
+  contents: read
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clean dependency install (npm install)
+        run: npm install
+      - name: Test original policy restoration preserves other detector
+        run: node --test test/stage10-policy-scope-contract.test.mjs
+      - name: Verify signed stage10 notes/audit implementation independently
+        if: always()
+        run: npm run test:10
