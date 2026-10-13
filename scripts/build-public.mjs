@@ -6,7 +6,7 @@ import { build } from 'esbuild';
 const root = resolve(import.meta.dirname, '..');
 const output = resolve(root, 'public', 'data.json');
 const config = JSON.parse(await readFile(resolve(root, 'aleph.config.json'), 'utf8'));
-if (![5, 6].includes(config.step)) throw new Error('현재 빌드는 5·6단계 자료실용입니다.');
+if (![5, 6, 7].includes(config.step)) throw new Error('현재 빌드는 5~7단계 자료실용입니다.');
 await mkdir(resolve(root, 'public'), { recursive: true });
 await writeFile(output, '{"notes":[]}\n', 'utf8');
 console.log('공개 data.json에는 메모를 포함하지 않습니다.');
