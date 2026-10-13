@@ -7,6 +7,18 @@ permissions:
 jobs:
   b-preupdate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
@@ -18,3 +30,18 @@ jobs:
       - name: Previous 1-9 test contracts
         if: always()
         run: node --test test/stage3.test.mjs test/stage4.test.mjs test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs
+      - name: Real isolated Postgres 16 atomic first-PUT snapshot and restore
+        env:
+          PGPASSWORD: synthetic-only
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGDATABASE: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-preupdate-setup.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/010-test-recovery.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/010-verify-backup.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/011-immutable-stage10-history.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/012-stage10-evidence-permissions.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/013-stage10-audit-reverification.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/014-stage10-preexisting-b-first-put.sql
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-preupdate-realpg.sql

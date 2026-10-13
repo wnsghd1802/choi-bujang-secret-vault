@@ -48,6 +48,20 @@ function fakeDb(){
           backups.set(row.id,{...row,run_id:p.p_run_id,identity:'b',content_sha256:p.p_hash});
           return {error:null,data:[row]};
         }
+        if(name==='update_test_note_with_backup'){
+          const old=notes.get(p.p_id);
+          if(!old||old.owner_id!==p.p_owner_id)return {error:null,data:[]};
+          const prior=backups.get(p.p_id);
+          if(prior){
+            if(prior.owner_id!==p.p_owner_id || prior.run_id!==p.p_run_id
+              || prior.identity!=='b'||contentDigest(prior.content)!==prior.content_sha256)
+              return {error:{code:'backup_mismatch'},data:null};
+          } else backups.set(p.p_id,{...old,run_id:p.p_run_id,identity:'b',
+             content_sha256:contentDigest(old.content)});
+          const row={...old,title:p.p_title,content:p.p_content};
+          notes.set(p.p_id,row);
+          return {error:null,data:[row]};
+        }
         if(name==='restore_test_note_from_backup'){
           const copy=backups.get(p.p_id),present=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
@@ -276,4 +290,55 @@ test('RED: a preseeded judge-B note gets a trusted pre-mutation snapshot on its 
   assert.deepEqual(db.notes.get(A_ID),unrelated);
   assert.deepEqual(db.audit[0],earlierAudit[0]);
   assert.equal(db.audit.length,2);
+});
+
+test('a second B PUT cannot overwrite the first immutable pre-update snapshot',async()=>{
+ const db=fakeDb(),original={id:B_ID,owner_id:noteOwnerId(B),
+   title:'Preseed safe B',content:'first safe content'};
+ db.notes.set(B_ID,{...original});
+ const h=createNotesHandler({item:true,db,verifyLogin:async()=>B});
+ const call=async(title,body)=>{
+   const res=response();
+   await h({method:'PUT',url:'/api/notes/'+B_ID,query:{id:B_ID},
+     headers,body:{title,body}},res);
+   return res;
+ };
+ assert.equal((await call('first write','attacker version 1')).code,200);
+ assert.equal((await call('second write','attacker version 2')).code,200);
+ assert.equal(db.backups.get(B_ID).content,'first safe content');
+ assert.equal(db.backups.get(B_ID).title,'Preseed safe B');
+ const res=await restore(db);
+ assert.equal(res.code,200);
+ assert.deepEqual(db.notes.get(B_ID),original);
+ assert.equal(db.audit.length,1);
+});
+
+test('B update rejects a backup from a different run without writing note/audit',async()=>{
+ const db=fakeDb();
+ const current={id:B_ID,owner_id:noteOwnerId(B),title:'Protected',content:'unchanged'};
+ db.notes.set(B_ID,{...current});
+ db.backups.set(B_ID,{...current,run_id:A_ID,identity:'b',
+   content_sha256:contentDigest(current.content)});
+ const res=response();
+ await createNotesHandler({item:true,db,verifyLogin:async()=>B})({
+   method:'PUT',url:'/api/notes/'+B_ID,query:{id:B_ID},headers,
+   body:{title:'attack',body:'not saved'},
+ },res);
+ assert.equal(res.code,409);
+ assert.deepEqual(db.notes.get(B_ID),current);
+ assert.equal(db.audit.length,0);
+});
+
+test('A note remains isolated; B may not initialize backup of A note via PUT',async()=>{
+ const db=fakeDb(),Arow={id:A_ID,owner_id:noteOwnerId(A),
+   title:'Keep A',content:'private A'};
+ db.notes.set(A_ID,{...Arow});
+ const res=response();
+ await createNotesHandler({item:true,db,verifyLogin:async()=>B})({
+   method:'PUT',url:'/api/notes/'+A_ID,query:{id:A_ID},headers,
+   body:{title:'Not A',body:'must refuse'},
+ },res);
+ assert.equal(res.code,404);
+ assert.deepEqual(db.notes.get(A_ID),Arow);
+ assert.equal(db.backups.size,0);
 });
