@@ -43,6 +43,7 @@ function fixture(mode) {
         select() { return query; },
         eq(k,v) { conditions.push([k,v]); return query; },
         maybeSingle(){ return query; },
+        order(){ return query; },
         async abortSignal(){
           if(table==='test_recovery_audit'){
             return {data:audit.map(row=>({...row})),error:null};
