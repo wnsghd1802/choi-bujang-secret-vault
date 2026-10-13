@@ -1,3 +1,49 @@
+# BYTE BACK 방어전 — 10단계: 백업에서 자료실 되살리기
+
+## 이번 단계의 보호 범위
+
+기존 1~9단계 정책·자료실·계정·서비스 규칙은 보존합니다. `src/decider.mjs`, `src/detect.mjs`, 이전 자료실 화면 및 권한 회수 제안은 고치지 않았습니다. **일반 사용자 메모는 절대 일괄 복원하지 않으며**, 비공개 시험 계정 B에서 생성된 가상 메모의 검증된 안전 사본 **한 건만** 복원합니다.
+
+### 1. 복원 전 버전·차이 확인과 정책 롤백
+
+- 검증된 기준점: 9단계 심판 통과 커밋 `98a9bc4f1b3131be97462e32cde2c52c19f7bbb5`.
+- `npm run policy:check`는 현재 `src/decider.mjs`와 `src/detect.mjs`를 기준점과 비교해 파일별 SHA-256 차이를 표시합니다. **기본 실행은 읽기 전용**이며 정책이나 DB를 수정하지 않습니다.
+- 실제 시험 정책이 변조된 경우에만, 먼저 `git status`와 `git diff -- src/decider.mjs src/detect.mjs`로 변경 범위·사라질 내용을 확인합니다. 다른 파일 수정이 있으면 복원을 중단합니다. 확인 후에만 `node scripts/restore-policy.mjs --apply --confirmed`를 로컬에서 직접 실행합니다.
+- 이 명령은 기존 내용을 `artifacts/policy-recovery/`에 사본으로 남긴 후 **두 정책 파일에만** 검증된 버전의 내용을 복원합니다. 복구 이후 git diff, 기존 6~9단계 테스트를 확인하고 커밋·배포해야 실서비스에 반영됩니다. `git reset --hard`나 DB 전체 덮어쓰기를 사용하지 않습니다. 현재 정책이 기준점과 같다면 복원할 내용은 없습니다.
+
+### 2. 안전 사본 준비 — 사용자가 직접 확인할 사항
+
+- `migrations/010-test-recovery.sql`을 **현재 프로젝트의 Supabase SQL Editor에서 먼저 검토**하고 수동으로 실행합니다. 기존 `public.notes`나 이전 테이블의 데이터를 삭제하거나 변경하지 않으며, 비공개 `test_note_backups` 테이블과 `test_recovery_audit`(복원 증거) 테이블 및 서비스 전용 SQL RPC 두 개를 생성합니다. 실제 환경 적용은 아직 하지 않았습니다.
+- SQL 하단의 권한 확인 결과가 `anon_read=false`, `student_direct_read=false`, `server_read=true`, `server_snapshot=true`인지 직접 확인해 주세요. 연결된 실제 자격증명이나 메모 본문은 공유하지 않습니다.
+- 시험 B의 **서명이 검증된 심판 토큰**으로 `POST /api/notes`를 호출해 가상 메모를 만들면, API가 `create_test_note_with_backup` RPC로 그 한 건과 보존 사본을 같은 DB 트랜잭션에 기록합니다. 기존 학생 계정 및 심판 A의 메모 생성 방식은 그대로입니다. 사본의 원문·토큰은 공개 URL, GitHub 또는 제출물에 넣지 않습니다.
+- 공격 재현을 위해서는 **시험 B가 생성한 가상 메모만** 내용을 수정하거나 삭제하세요. 기존 학생 메모·다른 계정·공지·감사 로그를 변조하거나 삭제하지 마세요.
+
+### 3. 단일 건 복구
+
+`aleph.config.json`에 `restoreRoute: "POST /api/restore"`를 등록했습니다. 이 경로는 기존 인증 검증기를 통과한 **심판 B**의 POST와 JSON `{"id":"<시험 메모 UUID>"}` 하나만 받습니다. URL 쿼리·`id2`·bulk·role·owner_id·hash 조작을 허용하지 않습니다.
+
+복구 API는 비공개 사본의 ID, B의 검증된 `sub`·실행 번호·a/b 구분에서 파생된 소유자 UUID, 실행 번호와 SHA-256을 검증합니다. 서버 전용 `restore_test_note_from_backup` RPC가 해당 **ID 한 건**만 트랜잭션으로 복원합니다. 같은 ID에 다른 사용자의 메모가 있으면 덮어쓰지 않습니다. 이후 DB에서 다시 조회하여 제목·본문·해시·소유자가 사본과 일치하는지 확인한 다음에만 `restored: true, verified: true`를 반환합니다. 오류는 범위 없는 복원을 하지 않고 거부합니다. 복구 성공 시 메모 본문을 포함하지 않는 시험 복구 이력이 새 테이블에 추가되며 이전 감사 기록은 보존됩니다.
+
+### 4. 복구 검증과 1~9단계 재검사
+
+**개발자 로컬 검사** (실행 결과는 심판 통과나 실제 DB 복원의 증거가 아닙니다):
+
+```bash
+npm ci
+npm run policy:check
+npm run test:10
+npm run decider:test
+npm run fixture:7
+npm run detect:test
+node --test test/stage3.test.mjs test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs
+```
+
+**실제 환경 확인은 사용자가 직접 수행해야 합니다:** SQL 적용과 테이블 권한 확인, 심판 B 가상 메모 1건의 생성·변조·삭제·복구, A 메모가 불변인지 확인, 비로그인 복구 요청 401, 일반 학생·심판 A 복구 요청 403, 잘못된 사본 해시 409, 복구 후 B의 안전 원본과 내용·소유자·해시 일치, 기존 로그인/메모 화면 정상 동작, 1~9단계 심판 결과 또는 실제 재실행 검증. 실제 심판 요청을 받아 테스트할 수 없는 부분은 **미실행**으로 남겨야 합니다.
+
+최종 커밋 후 `npm run bundle`로 `artifacts/submission.json`을 생성합니다. `bundle-notes.json`, 사본, 실제 자격증명, 원본 메모 내용, 복구 감사 로그 원문은 커밋/제출 대상이 아닙니다. 복구용 테이블을 적용하지 않은 상태에서는 실제 복구 API가 정상 동작했다고 보고하지 않습니다.
+
+---
+
 # BYTE BACK 방어전 — 9단계: 도플갱어 탐지 및 권한 회수 제안
 
 - **탐지 구현:** `src/detect.mjs`는 문서 `docs/DETECT_EVENTS.md`에 정의된 `detect(events)` 계약을 그대로 따릅니다. 각 가상 사건의 `at`, `method`, `identity.sub`만 사용하며 데이터를 저장하거나 토큰·실명·메모 본문을 출력하지 않습니다.
