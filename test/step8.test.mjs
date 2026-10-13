@@ -47,10 +47,12 @@ test('strict route blocks id2, nested export and unknown routes',async()=>{
     {queryLength:1},
   ]) await outcome(edit,'deny');
 });
-test('unverified item ID fails closed; own collection is server-scoped',async()=>{
-  await outcome({route:'PUT /api/notes/:id',method:'PUT',path:'/api/notes/'+ID},'deny');
-  await outcome({route:'GET /api/notes/:id',method:'GET',path:'/api/notes/'+ID},'deny');
-  await outcome({route:'GET /api/notes',path:'/api/notes'},'allow');
+test('individual notes delegate verified ownership to API, collection denies',async()=>{
+  await outcome({route:'PUT /api/notes/:id',method:'PUT',path:'/api/notes/'+ID},'allow');
+  await outcome({route:'GET /api/notes/:id',method:'GET',path:'/api/notes/'+ID},'allow');
+  await outcome({route:'GET /api/notes',path:'/api/notes'},'deny');
+  await outcome({route:'POST /api/notes',method:'POST',path:'/api/notes'},'deny');
+  await outcome({route:'DELETE /api/notes/:id',method:'DELETE',path:'/api/notes/'+ID},'deny');
 });
 test('7th stage composite anomaly retains step-up requirement',async()=>{
   const risky={signals:{source:'judge_fixture',region:'foreign',network:'unusual',hour:3},
