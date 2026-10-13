@@ -49,7 +49,7 @@ function fakeDb(){
         if(name==='restore_test_note_from_backup'){
           const copy=backups.get(p.p_id),present=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
-            || copy.content_sha256!==p.p_hash
+            || copy.content_sha256!==p.p_hash || copy.content_sha256!==contentDigest(copy.content)
             || (present && present.owner_id!==copy.owner_id))return {error:{code:'blocked'},data:null};
           const row={id:copy.id,owner_id:copy.owner_id,title:copy.title,content:copy.content};
           notes.set(copy.id,row);audit.push({id:copy.id});
@@ -132,4 +132,43 @@ test('same record ID belonging to another owner cannot be overwritten',async()=>
   db.notes.set(B_ID,{...other});
   const res=await restore(db);assert.equal(res.code,409);
   assert.deepEqual(db.notes.get(B_ID),other);
+});
+
+test('backup changed after first API read but before database restore cannot modify note',async()=>{
+  const db=fakeDb();await createB(db);
+  const originalRpc=db.rpc.bind(db);
+  db.rpc=(name,args)=>{
+    if(name==='restore_test_note_from_backup'){
+      // Simulates an attacker changing the snapshot between API check and RPC.
+      db.backups.get(B_ID).content='corrupt during verification';
+    }
+    return originalRpc(name,args);
+  };
+  db.notes.get(B_ID).content='already tampered';
+  const res=await restore(db);
+  assert.equal(res.code,409);
+  assert.equal(db.notes.get(B_ID).content,'already tampered');
+  assert.equal(db.audit.length,0);
+});
+test('API re-reads backup after recovery; changes on second read fail verification',async()=>{
+  const db=fakeDb();await createB(db);
+  const from=db.from.bind(db);
+  let backupReads=0;
+  db.from=table=>{
+    const query=from(table);
+    if(table!=='test_note_backups')return query;
+    const originalAbort=query.abortSignal;
+    query.abortSignal=async function(){
+      const answer=await originalAbort.call(this);
+      backupReads++;
+      if(backupReads===2){
+        answer.data={...answer.data,content:'altered in the second read'};
+      }
+      return answer;
+    };
+    return query;
+  };
+  const res=await restore(db);
+  assert.equal(backupReads,2);
+  assert.equal(res.code,409);
 });
