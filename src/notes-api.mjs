@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
 import { requestHasOnlyResourceId } from './resource-zones.mjs';
 import { noteOwnerId } from './note-owner.mjs';
+import { getServerDb } from './server-db-config.mjs';
 import { contentDigest } from './recovery-core.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
@@ -24,10 +25,9 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
     let actor;
     try {
       if (!verifyLogin) {
-        if (env.SUPABASE_URL !== new URL(config.identityProvider.issuer).origin || !env.SUPABASE_SECRET_KEY) {
-          return fail(503, '서버 로그인 설정을 확인해 주세요.');
-        }
-        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: env.SUPABASE_SECRET_KEY });
+        const dbConfig = getServerDb(env);
+        if (!dbConfig) return fail(503, '서버 로그인 설정을 확인해 주세요.');
+        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: dbConfig.secretKey });
       }
       actor = await verifyLogin(authorization);
     } catch { return fail(503, '로그인 확인을 완료하지 못했습니다.'); }
@@ -79,9 +79,13 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
       }
     }
     try {
-      db ??= createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
+      if (!db) {
+        const dbConfig = getServerDb(env);
+        if (!dbConfig) return fail(503, '서버 DB 설정을 확인해 주세요.');
+        db = createClient(dbConfig.url, dbConfig.secretKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        });
+      }
       const run = query => query.abortSignal(AbortSignal.timeout(8000));
       if (!item && req.method === 'GET') {
         const { data, error } = await run(db.from('notes').select(fields).eq('owner_id', ownerId).order('id'));

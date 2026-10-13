@@ -1,0 +1,23 @@
+name: Stage10 independent judge DB compatibility
+on:
+  push:
+    branches: [stage10-independent-db-runtime-probe]
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: node --test test/stage10-independent-db.test.mjs
+      - run: npm run test:10
+      - run: npm run decider:test
+      - run: npm run detect:test
+      - run: node --test test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs test/stage3.test.mjs test/stage4.test.mjs
