@@ -36,6 +36,15 @@ jobs:
           PGDATABASE: postgres
         run: |
           psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-postgres-setup.sql
+          # Simulate naive filename-ordered fresh installation: the current
+          # 010-backup-reverification.sql sorts before 010-test-recovery.sql.
+          if psql -v ON_ERROR_STOP=1 -f migrations/010-backup-reverification.sql > /tmp/out-of-order.log 2>&1; then
+            echo 'Out-of-order 010 migration unexpectedly completed'
+            exit 1
+          else
+            echo 'CONFIRMED: filename-order initialization fails before creation of test backup/audit tables'
+            grep -E '(ERROR|does not exist)' /tmp/out-of-order.log | head -n 5 || true
+          fi
           psql -v ON_ERROR_STOP=1 -f migrations/010-test-recovery.sql
           psql -v ON_ERROR_STOP=1 -f migrations/010-backup-reverification.sql
           psql -v ON_ERROR_STOP=1 -f migrations/011-immutable-stage10-history.sql
