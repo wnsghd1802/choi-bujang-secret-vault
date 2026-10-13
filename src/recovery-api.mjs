@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
 import { noteOwnerId } from './note-owner.mjs';
-import { isValidRestoreId, verifyPrivateCopy, validateRestoredRow } from './recovery-core.mjs';
+import { isValidRestoreId, verifyPrivateCopy, validateRestoredRow, comparePrivateCopies } from './recovery-core.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
 // Never allow arbitrary tables, owners, records or paths to be restored.
@@ -82,6 +82,15 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       if (restoreError || !Array.isArray(restored) || restored.length !== 1
           || !validateRestoredRow(restored[0], copy)) {
         return fail(409, '시험 메모 복구가 검증되지 않았습니다.');
+      }
+      // Re-read the source backup after the atomic restore. The DB RPC has
+      // independently verified this same snapshot INSIDE its transaction.
+      const { data: copyAgain, error: rereadError } = await run(db.from('test_note_backups')
+        .select('id,owner_id,run_id,identity,title,content,content_sha256')
+        .eq('id', body.id).eq('owner_id', ownerId).eq('run_id', actor.runId).maybeSingle());
+      if (rereadError || !comparePrivateCopies(copy, copyAgain,
+        { id: body.id, ownerId, runId: actor.runId })) {
+        return fail(409, '안전 사본 재조회 및 검증에 실패했습니다.');
       }
       const { data: checked, error: checkError } = await run(db.from('notes')
         .select('id,owner_id,title,content').eq('id', body.id)
