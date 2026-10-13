@@ -67,9 +67,11 @@ test('unreviewed committed additions cannot be silently reclassified as safe',as
  await writeFile(join(f.root,'src/decider.mjs'),committed+'\n// injected in HEAD\n');
  git(f.root,'add','src/decider.mjs');git(f.root,'commit','-qm','tampered committed policy');
  await writeFile(join(f.root,'src/decider.mjs'),committed+'\n// attacker worktree\n');
- const plan=await runPolicyRecovery({...f,output:()=>{}});
+ await assert.rejects(runPolicyRecovery({...f,output:()=>{}}),
+   /policy_head_contains_unreviewed_changes/u);
  await assert.rejects(runPolicyRecovery({...f,apply:true,confirmed:true,
-   expectedPlan:plan.plan,output:()=>{}}),/policy_head_contains_unreviewed_changes/u);
+   expectedPlan:'0'.repeat(64),output:()=>{}}),
+   /policy_head_contains_unreviewed_changes/u);
  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),committed+'\n// attacker worktree\n');
  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit before attack\n');
 });
