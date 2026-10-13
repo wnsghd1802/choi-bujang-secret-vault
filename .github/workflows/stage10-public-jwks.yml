@@ -1,0 +1,16 @@
+name: Stage10 public JWKS path existence (read-only)
+on:
+  push:
+    branches: [stage10-public-jwks-check]
+permissions:
+  contents: read
+jobs:
+  public-jwks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node test/stage10-public-jwks.mjs
