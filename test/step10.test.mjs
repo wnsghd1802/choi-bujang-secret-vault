@@ -249,3 +249,33 @@ test('stage10 fresh DB migrations create backup tables before verification hotfi
     .filter(name=>/^010-.*\.sql$/u.test(name)).sort();
   assert.deepEqual(files,['010-test-recovery.sql','010-verify-backup.sql']);
 });
+
+test('HTTP 200 restore exposes a real persisted audit receipt identifier',async()=>{
+ const db=fakeDb();await createB(db);
+ db.notes.get(B_ID).content='attacker change';
+ const res=await restore(db);
+ assert.equal(res.code,200);
+ assert.equal(db.audit.length,1);
+ assert.match(String(res.body.auditEventId??''),/^[1-9][0-9]*$/u,
+   'successful restore must provide the durable audit event id');
+ assert.equal(res.body.auditRecorded,true);
+});
+
+test('never accept a note-only RPC response that lacks audit persistence receipt',async()=>{
+ const db=fakeDb();await createB(db);
+ db.notes.get(B_ID).content='attacked';
+ const originalRpc=db.rpc.bind(db);
+ db.rpc=(name,args)=>{
+   if(name==='restore_test_note_from_backup'||name==='restore_test_note_with_receipt'){
+      const safe=db.backups.get(B_ID);
+      return {async abortSignal(){
+        return {error:null,data:[{id:safe.id,owner_id:safe.owner_id,title:safe.title,content:safe.content}]};
+      }};
+   }
+   return originalRpc(name,args);
+ };
+ const response=await restore(db);
+ assert.equal(response.code,409,'missing receipt must not get HTTP 200');
+ assert.equal(db.audit.length,0);
+ assert.equal(db.notes.get(B_ID).content,'attacked');
+});
