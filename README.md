@@ -4,6 +4,8 @@
 - **기존 DB에서 확인한 결함:** `service_role`이 `public.test_b_mutation_lineage`의 INSERT/UPDATE/DELETE를 직접 할 수 있었습니다. 침해 이전 B 안전 사본이 있어도 임의 계보를 주입하면 정상 복구 함수가 **다른 소유자 A의 행을 B로 덮어쓰고 정상 감사 영수증을 발급**하는 경우를 `BEGIN ... ROLLBACK` 시험에서 재현했습니다. 기존 사용자 데이터는 변경하지 않았습니다.
 - **최소 보완:** `migrations/017-stage10-lineage-write-gate.sql`에서 서버 역할의 직접 INSERT/DELETE/TRUNCATE를 회수하고, UPDATE는 복구 함수의 `SELECT ... FOR UPDATE`에 필요하므로 유지하되 **실제 DML은 테이블 소유자 권한에서 실행되는 신뢰한 DB 트리거만 통과**하도록 BEFORE UPDATE 게이트를 설치합니다.
 - **격리 검증:** `test/fixtures/stage10-lineage-authorization.sql`에서 직접 이력 생성·수정·삭제·TRUNCATE 거부, 적법한 B 메모 ID/소유자 변경 추적, 안전 복구, A 메모 및 기존 감사 기록 불변, 새 감사 기록 정확히 1건을 확인합니다. 시험은 트랜잭션 마지막에 ROLLBACK합니다.
+- **실제 적용 및 결과:** 연결된 Supabase 프로젝트에 `stage10_lineage_direct_write_gate_20261014` 마이그레이션 적용 성공. 적용 후 `service_role`은 SELECT·행 잠금용 UPDATE만 보유하고 직접 INSERT·DELETE·TRUNCATE는 거부되며, BEFORE UPDATE 게이트가 활성화되어 있습니다. 안전한 임시 거래 안에서 임의 계보 삽입·수정·삭제·TRUNCATE가 거부되고 정상 복구·감사 생성은 성공했습니다. 기존 메모 **8건**, 백업 **0건**, 감사 **0건**, 계보 **0건** 유지.
+- **최종 독립 CI:** [Stage 10 회귀 검사 성공](https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38451355109), [PostgreSQL 16 격리 B 변경/감사 테스트 성공](https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38451355106) (`79fafcb3`). 최초 `d4597419`의 격리 SQL 테스트는 PL/pgSQL 테스트 변수명과 `run_id` 열 이름이 모호하여 실패했고, 다음 커밋에서 **테스트 변수 이름만** 분리해 통과했습니다.
 - **한계:** DB 소유자·수퍼유저를 신뢰하는 경계이며, 심판이 이 DB 경로를 사용하는지 알 수 없습니다. 기존 점수를 통과했다고 주장하지 않습니다.
 
 ---
