@@ -211,3 +211,21 @@ test('policy diff refuses unexpected paths and invalid bytes', async () => {
   await assert.rejects(describePolicyDiff({ path:'src/decider.mjs',
     verified:null, current:Buffer.from('b') }), TypeError);
 });
+
+test('A remains able to read A note while B cannot access the same note ID', async () => {
+  const db=fakeDb();
+  db.notes.set(A_ID,{id:A_ID,owner_id:noteOwnerId(A),title:'A safe',content:'synthetic A note'});
+  const call=async actor=>{
+    const res=response();
+    await createNotesHandler({item:true,db,verifyLogin:async()=>actor})({
+      method:'GET',headers,query:{id:A_ID},url:'/api/notes/'+A_ID,
+    },res);
+    return res;
+  };
+  const a=await call(A),b=await call(B);
+  assert.equal(a.code,200);
+  assert.equal(a.body.title,'A safe');
+  assert.equal(b.code,404);
+  assert.equal(db.notes.size,1);
+  assert.equal(db.audit.length,0);
+});

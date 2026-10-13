@@ -1,0 +1,112 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { runPolicyRecovery } from '../scripts/policy-recovery.mjs';
+
+const safeDecider = `export const RULE_IDS=['resource_zone'];
+export async function decide(request) {
+  return {schema:'aleph.decision.v1',requestId:request.requestId,
+    decision: request.deviceRegistered && request.route === 'GET /notes/:id'
+      && request.path === '/notes/a-safe' ? 'allow' : 'deny',
+    reasonCode:'approved',ruleIds:['resource_zone']};
+}
+`;
+const breachedDecider = safeDecider.replace("? 'allow' : 'deny'", "? 'allow' : 'allow'");
+const safeDetect = "export const detect=()=>({action:'observe'});\n";
+const breachedDetect = "export const detect=()=>({action:'unsafe'});\n";
+function git(root,...args) {return execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim()}
+async function fixture(t) {
+  const root=await mkdtemp(join(tmpdir(),'s10-restore-fixture-'));
+  t.after(async()=>{await rm(root,{recursive:true,force:true})});
+  await mkdir(join(root,'src'));
+  await writeFile(join(root,'src/decider.mjs'),safeDecider);
+  await writeFile(join(root,'src/detect.mjs'),safeDetect);
+  await writeFile(join(root,'audit-history.txt'),'immutable audit event\n');
+  await writeFile(join(root,'other-service.txt'),'safe service rule\n');
+  await writeFile(join(root,'package.json'),'{"type":"module"}\n');
+  await writeFile(join(root,'.gitignore'),'artifacts/\n');
+  git(root,'init','-q');git(root,'config','user.email','fixture@example.test');git(root,'config','user.name','Test');
+  git(root,'add','.');git(root,'commit','-qm','verified stage9');
+  const checkpoint=git(root,'rev-parse','HEAD');
+  return {root,checkpoint};
+}
+const outputs=[];
+const inspect=async f=>runPolicyRecovery({...f,output:chunk=>outputs.push(chunk)});
+const apply=async(f,plan)=>runPolicyRecovery({...f,apply:true,confirmed:true,expectedPlan:plan,
+  output:chunk=>outputs.push(chunk)});
+
+test('safe unchanged policies need no restore and preserve existing audit',async t=>{
+  outputs.length=0;
+  const f=await fixture(t);
+  const result=await inspect(f);
+  assert.deepEqual(result.changed,[]);
+  assert.equal(result.applied,false);
+  assert.match(outputs.join(''),/안전 버전과 동일/u);
+  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit event\n');
+});
+
+test('restoring the reviewed plan re-denies forbidden reads, retains normal reads and other rules',async t=>{
+  outputs.length=0;
+  const f=await fixture(t);
+  await writeFile(join(f.root,'src/decider.mjs'),breachedDecider);
+  await writeFile(join(f.root,'src/detect.mjs'),breachedDetect);
+  const earlier=await inspect(f);
+  assert.deepEqual(earlier.changed,['src/decider.mjs','src/detect.mjs']);
+  assert.match(outputs.join(''),/\+.*'allow' : 'allow'/u);
+  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),breachedDecider);
+  await assert.rejects(runPolicyRecovery({...f,apply:true,confirmed:true,output:()=>{}}),/restore_requires_reviewed_plan/u);
+  const restored=await apply(f,earlier.plan);
+  assert.equal(restored.applied,true);
+  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),safeDecider);
+  assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8'),safeDetect);
+  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit event\n');
+  assert.equal(await readFile(join(f.root,'other-service.txt'),'utf8'),'safe service rule\n');
+  const {decide}=await import(pathToFileURL(join(f.root,'src/decider.mjs')).href);
+  const a={requestId:'a',deviceRegistered:true,route:'GET /notes/:id',path:'/notes/a-safe'};
+  assert.equal((await decide(a)).decision,'allow');
+  assert.equal((await decide({...a,requestId:'b',path:'/notes/a-other'})).decision,'deny');
+  assert.equal((await decide({...a,deviceRegistered:false})).decision,'deny');
+  assert.equal(git(f.root,'status','--porcelain').split('\n').filter(Boolean).every(x=>
+    x.includes('src/decider.mjs')||x.includes('src/detect.mjs')),true);
+  assert.ok(restored.backupDir);
+  const oldDecider=await readFile(join(restored.backupDir,'src__decider.mjs.before'),'utf8');
+  assert.equal(oldDecider,breachedDecider);
+});
+
+test('a stale review is rejected before modifying policy or audit',async t=>{
+  outputs.length=0;
+  const f=await fixture(t);
+  await writeFile(join(f.root,'src/decider.mjs'),breachedDecider);
+  const original=await inspect(f);
+  await writeFile(join(f.root,'src/decider.mjs'),breachedDecider+'// unexpected edit\n');
+  await assert.rejects(apply(f,original.plan),/restore_plan_changed/u);
+  assert.match(await readFile(join(f.root,'src/decider.mjs'),'utf8'),/unexpected edit/u);
+  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit event\n');
+});
+
+test('unrelated or staged changes block restore without any writes',async t=>{
+  const f=await fixture(t);
+  await writeFile(join(f.root,'src/decider.mjs'),breachedDecider);
+  const review=await inspect(f);
+  await writeFile(join(f.root,'audit-history.txt'),'tampered unrelated\n');
+  await assert.rejects(apply(f,review.plan),/restore_refused_other_or_staged_changes/u);
+  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),breachedDecider);
+  await writeFile(join(f.root,'audit-history.txt'),'immutable audit event\n');
+  git(f.root,'add','src/decider.mjs');
+  await assert.rejects(apply(f,review.plan),/restore_refused_other_or_staged_changes/u);
+  assert.equal(await readFile(join(f.root,'src/decider.mjs'),'utf8'),breachedDecider);
+});
+
+test('restore skips an intact second policy rather than rewriting it',async t=>{
+  const f=await fixture(t);
+  await writeFile(join(f.root,'src/decider.mjs'),breachedDecider);
+  const review=await inspect(f);
+  assert.deepEqual(review.changed,['src/decider.mjs']);
+  const result=await apply(f,review.plan);
+  assert.equal(result.applied,true);
+  assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8'),safeDetect);
+});
