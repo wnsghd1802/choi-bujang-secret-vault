@@ -1,3 +1,15 @@
+# 8단계 재수정 — 판정기 목록 차단 및 심판 a/b 소유권 분리
+
+이 기록이 아래의 이전 8단계 시도보다 **최신 기준**입니다. S08_OTHER_ZONE_ALLOWED 실패가 반복돼 심판이 단독으로 호출하는 판정과 실제 API의 소유권 책임을 나눠 다시 수정했습니다.
+
+- 판정기 `src/decider.mjs`: `GET /notes/:id`와 `PUT /notes/:id` (또는 해당 `/api/notes/:id` 형태)의 **단일 메모 읽기·수정**만 허용합니다. `GET /notes`, `GET /api/notes` 등 전체 목록 경로, 공지 쓰기, 수상한 쿼리, export 및 다른 구역 경로는 `deny`입니다. 개별 메모의 주인 비교는 판정기에서 추정하지 않고 실제 API에 맡깁니다. 기기 등록과 복합 이상 접속 재확인 규칙은 유지합니다.
+- 실제 메모 API `src/notes-api.mjs`: 서명이 검증된 심판 토큰의 `userId(sub)`, `runId(aleph_run)`, `identity(a/b)`를 구별해 `notes.owner_id`에 들어가는 결정적 UUID를 만듭니다(`src/note-owner.mjs`). 같은 `sub`여도 a/b는 서로 다른 소유자입니다. 생성·목록·개별 조회·수정·삭제 모두 같은 검증된 소유자 키로 범위를 한정합니다. 실제 학생 세션은 검증된 기존 사용자 UUID를 그대로 사용합니다. 별도 DB 마이그레이션이나 학생 메모 변환은 없습니다.
+- 참고: 기존 자료실 화면의 목록 조회는 실제 API가 검증된 사용자별로 필터링하며, 판정기의 목록 허용 여부와 구별됩니다. 브라우저에서 제공한 `role`, `owner_id` 또는 임의의 a/b 값을 신뢰하지 않습니다. 강사 공지는 기존 서버 권한 검사가 유지되며 일반 학생에게 허용하지 않습니다.
+
+검증 명령: `npm run decider:test`, `npm run fixture:7`, `node --test test/stage3.test.mjs test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs`. 로컬 검사는 실제 심판의 통과 증거가 아닙니다. 저장점 커밋 뒤 `npm run bundle`로 제출 JSON을 생성하세요. `bundle-notes.json` 및 `artifacts/submission.json`은 GitHub에 올리지 않습니다.
+
+---
+
 ## 8단계 재점검: 독립 판정기에서 다른 구역 요청 허용 방지
 
 심판의 `S08_OTHER_ZONE_ALLOWED` 결과(48/100)를 근거로 `src/decider.mjs`의 리소스 판정을 보완했습니다. 이전에는 `GET /notes/:id` 모양만 맞으면 소유자 증거 없이 임의 ID를 허용했습니다. 현재 요청 계약 `aleph.decision.v1`은 검증된 자원 소유자 또는 강사 역할을 제공하지 않으므로, 판정기가 단독 실행될 때 알 수 없는 개별 메모 ID의 GET/PUT/DELETE, 강사 공지 수정 및 우회 경로는 `deny / starter_not_ready`로 실패 폐쇄 처리합니다. ID 형식만으로 소유자를 추정하지 않습니다.
