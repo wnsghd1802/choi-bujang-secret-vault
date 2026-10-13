@@ -1,0 +1,18 @@
+name: Stage10 isolated audit reproduction
+on:
+  push:
+    branches: [stage10-audit-isolation-repro]
+permissions:
+  contents: read
+jobs:
+  audit-repro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --test test/stage10-audit-isolation-repro.test.mjs
