@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
+import { requestHasOnlyResourceId } from './resource-zones.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -35,10 +36,25 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
       res.setHeader('Allow', methods.join(', '));
       return fail(405, '지원하지 않는 요청 방식입니다.');
     }
+    // Resolve the exact server resource ID, never a query selector such as id2 or export.
     let id;
     if (item) {
       id = req.query?.id;
-      if (typeof id !== 'string' || !UUID.test(id)) return fail(400, '올바른 메모 ID가 필요합니다.');
+      if (typeof id !== 'string' || !UUID.test(id)
+          || !requestHasOnlyResourceId(req, id, '/api/notes')) {
+        return fail(400, '올바른 메모 경로가 필요합니다.');
+      }
+    } else {
+      if (req.query && Object.entries(req.query).some(([key, value]) =>
+        key !== 'id' || value !== undefined)) return fail(400, '허용하지 않는 자료 요청입니다.');
+      if (typeof req.url === 'string') {
+        let address;
+        try { address = new URL(req.url, 'https://request.invalid'); }
+        catch { return fail(400, '올바른 메모 경로가 필요합니다.'); }
+        if (address.pathname !== '/api/notes' || address.search || address.hash) {
+          return fail(400, '허용하지 않는 자료 요청입니다.');
+        }
+      }
     }
     let body;
     if (['POST', 'PUT'].includes(req.method)) {
