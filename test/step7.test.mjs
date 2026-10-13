@@ -5,7 +5,10 @@ import { decide, RULE_IDS } from '../src/decider.mjs';
 const request = () => ({
   schema: 'aleph.decision.v1',
   requestId: '8ecc7c0d-e793-4cb0-9f68-a8665e0daa55',
-  deviceRegistered: true,
+  classId: 'class_fixture', projectId: 'project_fixture',
+  subjectId: 'learner_fixture', deviceId: 'aaaaaaaaaaaaaaaa',
+  service: 'notes', method: 'GET', path: '/notes/demo', route: 'GET /notes/:id',
+  queryLength: 0, deviceRegistered: true,
   signals: { source: 'judge_fixture', region: 'local', network: 'usual', hour: 14 },
   recentEvents: [],
   stepUp: { verified: false, authAgeSeconds: null },
@@ -25,8 +28,9 @@ async function expectDecision(input, decision, reasonCode) {
   assert.ok(output.ruleIds.length > 0 && output.ruleIds.every(rule => RULE_IDS.includes(rule)));
 }
 
-test('implemented stage 6 and 7 rules only', () => {
-  assert.deepEqual([...RULE_IDS], ['device_registered', 'step_up_required']);
+test('stage 6 and 7 rules remain implemented', () => {
+  assert.ok(RULE_IDS.includes('device_registered'));
+  assert.ok(RULE_IDS.includes('step_up_required'));
 });
 test('registered normal request allows', async () => {
   await expectDecision(request(), 'allow', 'approved');
