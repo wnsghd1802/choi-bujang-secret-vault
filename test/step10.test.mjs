@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readdir } from 'node:fs/promises';
 import { createRecoveryHandler } from '../src/recovery-api.mjs';
 import { createNotesHandler } from '../src/notes-api.mjs';
 import { noteOwnerId } from '../src/note-owner.mjs';
@@ -241,4 +242,10 @@ test('pre-existing B memo without verified pre-attack copy is not restored or au
   assert.deepEqual(db.notes.get(B_ID),before);
   assert.deepEqual(db.audit,auditBefore);
   assert.equal(db.backups.size,0,'an attacked note must not become a trusted backup');
+});
+
+test('stage10 fresh DB migrations create backup tables before verification hotfix',async()=>{
+  const files=(await readdir(new URL('../migrations/',import.meta.url)))
+    .filter(name=>/^010-.*\.sql$/u.test(name)).sort();
+  assert.deepEqual(files,['010-test-recovery.sql','010-verify-backup.sql']);
 });
