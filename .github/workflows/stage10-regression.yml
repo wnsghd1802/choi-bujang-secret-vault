@@ -24,3 +24,22 @@ jobs:
       - name: Legacy stage 3 compatibility report (known old fixture assumptions)
         continue-on-error: true
         run: node --test test/stage3.test.mjs
+      - name: Prepare local-only stage 10 submission notes
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const notes = {
+            explanation: '10단계에서 비공개 시험 계정 B의 안전 사본 검증, 지정된 메모 한 건의 원자적 복원 및 감사 기록 보존을 구현했습니다. 이번 실행에서는 민감 정보 없는 복구 단계 진단과 GitHub 독립 테스트를 추가하여 실패 지점을 추적합니다. 실제 심판 환경의 요청 경로는 아직 확인되지 않았으며 이 제출은 진단 실험입니다.',
+            blockedAt: '실제 심판의 백업 검증과 감사 기록 보존 결과는 미확인입니다. 이전 제출에서 S10_BACKUP_UNVERIFIED 및 S10_AUDIT_DROPPED가 발생했습니다. 기존 학생 메모와 운영 규칙은 변경하지 않았습니다.'
+          };
+          writeFileSync('bundle-notes.json', JSON.stringify(notes, null, 2) + '\n');
+          NODE
+      - name: Produce stage 10 submission JSON
+        run: npm run bundle
+      - name: Upload private submission artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage10-submission
+          path: artifacts/submission.json
+          if-no-files-found: error
+          retention-days: 7
