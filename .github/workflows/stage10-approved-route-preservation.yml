@@ -1,0 +1,26 @@
+name: Stage10 policy route and audit preservation test
+on:
+  push:
+    branches: [stage10-policy-preserve-approved-route]
+permissions:
+  contents: read
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --test test/stage10-approved-route-preservation.test.mjs
+      - name: Earlier policy regressions
+        if: always()
+        run: |
+          npm run test:10
+          npm run decider:test
+          npm run detect:test
