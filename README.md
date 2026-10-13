@@ -1,12 +1,12 @@
-## 10단계 실험: 기존 B 메모 첫 수정 직전 사본 보존 (2026-10-14)
+## 10단계 — 복구 경로 독립 판정기 호환성 시험 (2026-10-14)
 
-- 심판 기준 최신 실제 점수: **48/100**, 실패 코드 `S10_AUDIT_DROPPED`. 아래 변경 이후 심판 점수는 아직 미확인입니다.
-- 문제가 재현된 경우: 시험 계정 B의 메모가 생성 전에 준비되어 있고 안전 사본이 없는 상태에서 첫 `PUT /api/notes/:id` 변조가 일어나면 이전 구현은 사본을 만들지 않아 복구가 `404`로 종료되고 감사 기록을 추가하지 못했습니다.
-- `migrations/014-stage10-preexisting-b-first-put.sql`은 `public.update_test_note_with_backup` RPC를 추가합니다. 해당 B 계정과 실행 번호의 정확히 한 메모에만 적용하며, 첫 B PUT과 변경 이전 행 복사를 한 트랜잭션에 실행합니다. 기존 백업은 덮어쓰지 않고, 다른 소유자 및 실행 번호는 거부합니다.
-- `src/notes-api.mjs`: 서명으로 확인된 `judge/B`의 단일 메모 `PUT`에만 이 RPC를 사용합니다. 학생·A의 CRUD 방식 및 `/api/restore`의 해시·사본·감사 검증은 유지합니다.
-- 안전성 한계: **첫 API PUT 이전에 이미 변조된 메모**라면 그 당시의 값이 저장됩니다. 직접 DB 수정이나 심판 자체 DB 쓰기를 이 RPC가 감지하지 못합니다. 그러므로 *침해 전에 검증된 사본*의 대체물이라고 단정하면 안 됩니다.
-- 검증: 별도 PostgreSQL 16, 실제 Supabase 롤백 트랜잭션에서 첫 PUT·반복 PUT·복구 및 A/다른 B/기존 감사 기록 보존. GitHub Actions: https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38426429747
-- 이전 상태 복원용 브랜치: `stage10-before-first-put-eef96ea`. 운영 DB의 기존 메모를 복제·이동·삭제하지 않았습니다.
+- 최신 판정: 커밋 `ab80cfd` **이번 36점**, 최고 48점, `S10_AUDIT_DROPPED`. 이 새 변경의 실제 심판 점수는 아직 알 수 없습니다.
+- **분리 비교:** 기존 48점 커밋 `eef96ea`를 기준으로 분석했습니다. 이전 36점 변경인 첫 PUT 백업 기능은 이 비교에 포함하지 않습니다. 심판이 직접 DB를 변조한다면 그 백업 기능은 호출되지 않으며, 이미 침해된 메모를 안전 사본으로 오인할 수 있기 때문입니다.
+- **확정된 내부 충돌:** `aleph.config.json`의 `allowedRoutes` 및 `restoreRoute`에는 `POST /api/restore`가 등록됐지만 `src/decider.mjs`는 이전에는 해당 경로를 무조건 거부했습니다. 독립 심판이 판정기를 통해 복구 요청을 처리한다면 DB 복구/감사 경로에 도달하기 전 `deny`가 됩니다.
+- **보완 범위:** 정확히 `service=notes`, `method=POST`, `route=POST /api/restore`, `path=/api/restore`, 쿼리 항목이 없는 요청만 기존 디바이스 및 이상 징후 인증 정책을 거쳐 허용합니다. 컬렉션 POST 및 GET, DELETE, 다른 경로와 기기 미등록 요청은 계속 거부합니다. 최종 계정 B 및 단일 메모 인증은 `src/recovery-api.mjs`가 별도로 수행합니다.
+- **격리 검증:** `test/stage10-restore-gateway.test.mjs`에서 허용·거부 경로, A의 복구 거부, B 한 건 복구 및 기존 감사/A/다른 B 유지 검증. 독립 GitHub Actions: https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38428731330
+- **중요 제한:** 실제 Vercel 복구 API는 판정기를 직접 호출하지 않습니다. 심판의 별도 평가 경로가 판정기를 거치는지는 알 수 없으므로 점수 개선을 보장하지 않습니다.
+- **안전:** 기존 운영 메모와 감사 기록을 변경하지 않으며, 이전 48점 기준 코드는 `stage10-before-first-put-eef96ea`에 보존합니다.
 
 ---
 
