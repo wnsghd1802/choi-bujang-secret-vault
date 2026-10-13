@@ -1,3 +1,17 @@
+# BYTE BACK 방어전 — 7단계: 평소와 다른 접속은 다시 확인합니다
+
+6단계의 `device_registered` 규칙을 유지하고 `step_up_required`를 추가했습니다. 운영 엔진이 검증하여 전달하는 `deviceRegistered`, `signals`, `recentEvents`, `stepUp`만 사용하며 미등록 기기는 언제나 `deny / device_not_registered`로 먼저 거부합니다.
+
+로컬 가상 사건(`signals.source: judge_fixture`)에서 심야 시각, 처음 보는 네트워크, 낯선 지역, 5분 이내의 활동 급증이 **모두** 겹치면 `step_up / step_up_required`를 요청합니다. 지역이나 시각 한 가지가 달라지는 것만으로 사용자를 거부하지 않습니다. 복합 이상 사건이어도 운영 엔진이 검증한 최근 추가 확인(`stepUp.verified === true`, `authAgeSeconds` 0~900)이 있으면 다시 `allow / approved`로 판정합니다.
+
+**운영 한계:** 현재 실제 접속 경로의 위치·네트워크 정보 출처는 `none`이고 값은 `unknown`입니다. 가상 `judge_fixture` 정보를 실제 위치 증거로 간주하지 않습니다. 기존 `/api/auth`에는 일반 로그인·갱신·로그아웃 기능만 있으며, 판정 엔진과 결합된 새 로그인 증명 확인 계약은 보이지 않습니다. 그러므로 실제 재로그인 토큰·인증서를 새로 만들거나 브라우저에서 신뢰하지 않습니다. 실제 재확인 UI/자료 차단은 운영 엔진의 별도 계약이 제공된 환경에서 검증해야 합니다.
+
+검증: `npm run decider:test`, `npm run fixture:7`. 로컬 테스트는 운영 심판 통과를 의미하지 않습니다. 기존 자료실을 빌드할 때는 `npm run build -- --local`; 저장점을 커밋한 뒤 개인 환경에 비공개 `bundle-notes.json`을 준비하고 `npm run bundle`로 제출 JSON을 생성합니다. `bundle-notes.json`과 `artifacts/submission.json`은 Git에 넣지 않습니다.
+
+기존 배포 주소, 로그인 발급자, 허용 경로, 원본 API, 사용자 DB 및 XDR 보너스 코드는 변경하지 않았습니다.
+
+---
+
 # BYTE BACK 방어전 — 6단계: 등록된 기기만 자료실에
 
 운영 엔진이 검증하여 전달하는 `request.deviceRegistered` 값만 사용합니다. `true`인 요청은 `allow / approved`, `false`이거나 값이 없거나 잘못된 요청은 `deny / device_not_registered`로 판정합니다. `RULE_IDS`에는 실제 구현된 `device_registered` 규칙 하나만 둡니다. 브라우저가 보낸 기기 등록 주장이나 개인키를 사용하지 않습니다.
