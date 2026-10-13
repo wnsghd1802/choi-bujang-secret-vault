@@ -29,14 +29,6 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
         return fail(400, '복구 경로를 확인해 주세요.');
       }
     }
-    let body;
-    try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
-    catch { return fail(400, 'JSON 형식을 확인해 주세요.'); }
-    if (!body || typeof body !== 'object' || Array.isArray(body)
-      || Object.keys(body).sort().join(',') !== 'id' || !isValidRestoreId(body.id)) {
-      return fail(400, '복구할 시험 메모 ID 한 건만 지정해 주세요.');
-    }
-
     const authorization = req.headers?.authorization;
     if (typeof authorization !== 'string' || authorization.length > 8192
         || !/^Bearer [\w-]+\.[\w-]+\.[\w-]+$/u.test(authorization)) {
@@ -59,6 +51,15 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
         || !isValidRestoreId(actor.runId)) return fail(403, '시험 계정 B만 복구할 수 있습니다.');
     const ownerId = noteOwnerId(actor);
     if (!ownerId) return fail(403, '소유자를 검증하지 못했습니다.');
+
+    let body;
+    try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+    catch { return fail(400, 'JSON 형식을 확인해 주세요.'); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)
+      || Object.keys(body).sort().join(',') !== 'id' || !isValidRestoreId(body.id)) {
+      return fail(400, '복구할 시험 메모 ID 한 건만 지정해 주세요.');
+    }
+
 
     try {
       const db = suppliedDb ?? createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
