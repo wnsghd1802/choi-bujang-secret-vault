@@ -342,3 +342,22 @@ test('A note remains isolated; B may not initialize backup of A note via PUT',as
  assert.deepEqual(db.notes.get(A_ID),Arow);
  assert.equal(db.backups.size,0);
 });
+
+test('SECURITY LIMIT: after out-of-band compromise, first PUT snapshots compromised bytes (not trusted)',async()=>{
+ const db=fakeDb(),preexisting={id:B_ID,owner_id:noteOwnerId(B),
+   title:'Already attacked',content:'out of band corrupted before any API PUT'};
+ db.notes.set(B_ID,{...preexisting});
+ const responsePut=response();
+ await createNotesHandler({item:true,db,verifyLogin:async()=>B})({
+   method:'PUT',url:'/api/notes/'+B_ID,query:{id:B_ID},headers,
+   body:{title:'Second attacker payload',body:'another alteration'},
+ },responsePut);
+ assert.equal(responsePut.code,200);
+ assert.equal(db.backups.get(B_ID).content,preexisting.content);
+ const answer=await restore(db);
+ assert.equal(answer.code,200);
+ assert.equal(db.notes.get(B_ID).content,preexisting.content);
+ // Red flag: this recovers compromised bytes, not the authentic pre-breach value.
+ assert.notEqual(db.notes.get(B_ID).content,'true original missing from database');
+ console.log('SAFETY_LIMIT: first-PUT preservation cannot certify a previously compromised note');
+});
