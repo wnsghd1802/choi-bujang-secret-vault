@@ -64,12 +64,11 @@ language plpgsql security invoker set search_path = public, pg_temp as $$
 declare
   safe_copy public.test_note_backups%rowtype;
 begin
-  -- Lock just the selected copy. No bulk restore or policy changes.
+  -- Select only the immutable private snapshot; no bulk restore or policy changes.
   select * into safe_copy from public.test_note_backups b
     where b.id = p_id and b.owner_id = p_owner_id
       and b.run_id = p_run_id and b.identity = 'b'
-      and b.content_sha256 = p_hash
-    for share;
+      and b.content_sha256 = p_hash;
   if not found then raise exception 'backup_missing_or_unverified'; end if;
 
   -- A same-ID memo of another owner MUST NOT be modified or replaced.
