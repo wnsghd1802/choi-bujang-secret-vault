@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const HASH = /^[0-9a-f]{64}$/u;
 
 export const contentDigest = content =>
