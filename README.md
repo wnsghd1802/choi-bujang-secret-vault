@@ -1,3 +1,19 @@
+# BYTE BACK 방어전 — 8단계: 자료마다 갈 수 있는 구역을 나눕니다
+
+기존 `notes.id` UUID와 메모 응답 구조를 유지하면서, 서버 내부 자원 식별자를 `memo:<UUID>`와 `instructor_notice:<UUID>`로 분리했습니다(`src/resource-zones.mjs`). 화면 메뉴·원본 메모·기존 소유자 RLS·로그인 코드·XDR 방어 파일은 바꾸지 않았습니다.
+
+판정기는 기존 `device_registered`, `step_up_required` 규칙과 새 `resource_zone` 규칙을 사용합니다. `service/method/route/path/queryLength`가 일치하는 **정확한 메모 경로**만 기존 권한 검사를 수행하는 API에 위임합니다. `id2`·중첩 경로·`export`·비어 있지 않은 쿼리·알 수 없는 경로, 강사 공지 수정은 판정기에서 거부합니다. 이유 코드는 등록 여부를 확인할 수 없는 신규 문자열 대신 기존 시작 틀의 `starter_not_ready`를 사용하여 실패 시 닫히도록 했습니다. `aleph.decision.v1`에는 메모 저장 소유자나 검증된 강사 역할이 제공되지 않으므로 이 정보가 있다고 가정하지 않습니다.
+
+실제 `/api/notes` 및 `/api/notes/:id`는 검증된 토큰에서 얻은 `actor.userId`와 DB의 `owner_id`를 계속 비교합니다. 메모 API에 우회 쿼리를 넣거나 다른 사용자의 UUID를 요청해도 데이터가 반환되지 않도록 서버 경로 점검을 추가했습니다. 브라우저 요청 본문의 `role` 또는 `owner_id`를 권한 근거로 사용하지 않습니다.
+
+새 `PUT /api/notices/:id`는 별도 **강사 공지 전용 API**입니다. 검증된 학생 세션 외에는 접근할 수 없으며, 서버에서 `instructor_grants.can_edit_notices`를 확인한 경우에만 `instructor_notices` 저장 항목을 수정합니다. 강사 권한 기록이 비어 있거나 테이블이 없다면 거부합니다. 누구도 강사라고 임의로 등록하지 않았습니다.
+
+**수동 적용 필요:** `migrations/008-resource-zones.sql`은 기존 `public.notes`에 손대지 않고 새 `instructor_grants` 및 `instructor_notices` 테이블만 생성하며, anon/authenticated의 직접 테이블 접근은 허용하지 않습니다. 아직 실제 Supabase에 적용되지 않았으며 기존 자료는 그대로입니다. 진짜 강사 권한은 운영자가 신원을 별도 확인한 뒤 서버 측에서 저장해야 하고, 강사 판정 권한의 엔진 연동은 향후 운영 계약이 필요합니다. 따라서 현재의 심판용 로컬 검증은 실제 강사 수정 기능의 운영 성공 증거가 아닙니다.
+
+검증: `npm run decider:test`, `npm run fixture:7`, `node --test test/step7.test.mjs test/step8.test.mjs`, `npm run build -- --local`. 커밋 후 로컬에서 비공개 `bundle-notes.json`을 준비하고 `npm run bundle`로 제출 묶음을 생성합니다. 이 결과를 심판 판정으로 기록하지 않습니다.
+
+---
+
 # BYTE BACK 방어전 — 7단계: 평소와 다른 접속은 다시 확인합니다
 
 6단계의 `device_registered` 규칙을 유지하고 `step_up_required`를 추가했습니다. 운영 엔진이 검증하여 전달하는 `deviceRegistered`, `signals`, `recentEvents`, `stepUp`만 사용하며 미등록 기기는 언제나 `deny / device_not_registered`로 먼저 거부합니다.
