@@ -67,7 +67,7 @@ function fakeDb() {
           backups.set(row.id,backup);
           return {data:[{...row}],error:null};
         }
-        if(name==='restore_test_note_with_receipt'){
+        if(name==='restore_test_note_with_lineage'){
           const copy=backups.get(p.p_id),existing=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
               || copy.identity!=='b' || copy.content_sha256!==p.p_hash

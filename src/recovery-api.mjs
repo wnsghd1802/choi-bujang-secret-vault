@@ -120,7 +120,7 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       // Atomic restore, re-verification and audit append in ONE DB transaction.
       // No potentially failing cross-request read may follow this commit.
       phase = 'restore_rpc';
-      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_with_receipt', {
+      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_with_lineage', {
         p_id: body.id, p_owner_id: ownerId, p_run_id: actor.runId,
         p_hash: copy.content_sha256,
       }));
