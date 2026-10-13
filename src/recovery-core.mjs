@@ -30,3 +30,11 @@ export function validateRestoredRow(row, copy) {
     && row.content === copy.content
     && contentDigest(row.content) === copy.content_sha256;
 }
+
+export function comparePrivateCopies(original, checked, target) {
+  return verifyPrivateCopy(original, target) && verifyPrivateCopy(checked, target)
+    && checked.id === original.id && checked.owner_id === original.owner_id
+    && checked.run_id === original.run_id && checked.identity === original.identity
+    && checked.title === original.title && checked.content === original.content
+    && checked.content_sha256 === original.content_sha256;
+}
