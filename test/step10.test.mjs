@@ -229,3 +229,16 @@ test('A remains able to read A note while B cannot access the same note ID', asy
   assert.equal(db.notes.size,1);
   assert.equal(db.audit.length,0);
 });
+
+
+test('pre-existing B memo without verified pre-attack copy is not restored or audited',async()=>{
+  const db=fakeDb();
+  db.notes.set(B_ID,{id:B_ID,owner_id:noteOwnerId(B),title:'old B',content:'already attacked'});
+  db.audit.push({id:A_ID,kind:'historical_event'});
+  const before=structuredClone(db.notes.get(B_ID)),auditBefore=structuredClone(db.audit);
+  const result=await restore(db);
+  assert.equal(result.code,404);
+  assert.deepEqual(db.notes.get(B_ID),before);
+  assert.deepEqual(db.audit,auditBefore);
+  assert.equal(db.backups.size,0,'an attacked note must not become a trusted backup');
+});
