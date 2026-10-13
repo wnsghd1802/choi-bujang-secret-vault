@@ -1,3 +1,11 @@
+# BYTE BACK 방어전 — 6단계: 등록된 기기만 자료실에
+
+운영 엔진이 검증하여 전달하는 `request.deviceRegistered` 값만 사용합니다. `true`인 요청은 `allow / approved`, `false`이거나 값이 없거나 잘못된 요청은 `deny / device_not_registered`로 판정합니다. `RULE_IDS`에는 실제 구현된 `device_registered` 규칙 하나만 둡니다. 브라우저가 보낸 기기 등록 주장이나 개인키를 사용하지 않습니다.
+
+로컬 가상 요청 검사: `npm run decider:test` (등록 기기 통과 / 미등록 기기 거부). 기존 웹 화면과 자료 API를 확인하려면 `npm run build -- --local` 및 배포된 자료실에서 정상 로그인·자료 조회를 점검합니다. 이 로컬 검사는 실제 운영 릴레이의 기기 등록 확인이나 심판 통과를 증명하지 않습니다. 6단계 설정으로 `npm run bundle`을 실행하려면 저장점 커밋 후 로컬 `bundle-notes.json`이 필요합니다. 기존 5단계 화면·DB 권한·XDR 보너스 코드는 변경하지 않습니다.
+
+---
+
 ## 보너스 XDR-02 저장점
 
 웹 입력 조작 보너스 과제를 `xdr/web-injection/`에 독립 모듈로 추가했습니다. `decide.mjs`는 **import/Jev/외부 요청/파일 I/O 없이** 원본 경보만으로 SQL 주입, 스크립트 삽입, 경로 이탈, 명령 구분자의 반복 단서를 판정합니다. T1190 태그나 수업 단어만으로 차단하지 않습니다.
