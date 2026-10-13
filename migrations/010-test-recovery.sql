@@ -87,7 +87,7 @@ begin
     (note_id, owner_id, run_id, restored_sha256)
     values (p_id, p_owner_id, p_run_id, p_hash);
 end;
-$;
+$$;
 
 -- Functions are callable only with the server's service-role credential.
 revoke all on function public.create_test_note_with_backup(
