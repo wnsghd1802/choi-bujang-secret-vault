@@ -1,3 +1,14 @@
+## 10단계 — 독립 심판 DB와 학생 인증 발급자 분리 (2026-10-13)
+
+- 운영 심판의 가장 최근 실패 코드는 `S10_AUDIT_DROPPED`이고 점수는 36점, 최고 점수는 48점입니다. 이번 보완의 심판 효과는 미확인입니다.
+- 실제 HTTP 코드 `src/notes-api.mjs`와 `src/recovery-api.mjs`에서 기존에는 `SUPABASE_URL`이 학생 인증 발급자(`identityProvider.issuer`)의 origin과 같아야 했습니다. 심판이 별도 Supabase에서 B 메모/침해 전 사본/감사를 준비하는 경우 서버 설정이 달라 HTTP 503으로 중단될 수 있습니다.
+- `src/server-db-config.mjs`가 서버 측 `SUPABASE_URL`의 HTTPS `*.supabase.co` origin 및 서버 전용 비밀 키(`SUPABASE_SECRET_KEY` 또는 기존 `SUPABASE_SERVICE_ROLE_KEY`)를 검증합니다. 공개 키와 임의 URL은 거부합니다. 메모 DB 연결은 이 서버 설정을 사용하지만 **로그인 토큰의 issuer, audience, 서명 검증 규칙은 기존 설정에 고정**합니다.
+- 독립 검증: `npm install`, `node --test test/stage10-independent-db.test.mjs`, `npm run test:10` 및 1~9단계 회귀 검사가 통과했습니다. 실험: https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38414938877
+- **변경하지 않은 부분:** 시험 B 메모의 백업 검증, 단일 메모/소유자/실행 번호 검사, SQL 원자적 복구·감사 기록, 기존 1~9단계 정책, DB 저장 데이터. 심판이 정말 다른 Supabase 인스턴스를 쓰는지는 확인되지 않았습니다.
+- `src/decider.mjs`의 등록된 복구 경로 거부는 격리 브랜치에서 따로 재현했습니다. 그러나 실제 Vercel HTTP 복구 경로는 이 판정기를 사용하지 않으므로 운영 변경을 보류했습니다.
+
+---
+
 ## 10단계 독립 DB 초기 설치 순서 수정 (2026-10-13)
 
 - **제작 3 판정:** 기존 심판 48/100점, `S10_AUDIT_DROPPED`. 새 심판 판정은 아직 없습니다.
