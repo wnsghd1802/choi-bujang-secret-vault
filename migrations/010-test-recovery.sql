@@ -20,6 +20,19 @@ grant select, insert on public.test_note_backups to service_role;
 -- No update/delete privilege is needed: good copies cannot be overwritten
 -- from the application, even after malicious edits/deletes to original notes.
 
+-- Append-only recovery evidence (no memo title/body/token).
+create table if not exists public.test_recovery_audit (
+  event_id bigint generated always as identity primary key,
+  note_id uuid not null,
+  owner_id uuid not null,
+  run_id uuid not null,
+  restored_sha256 text not null,
+  restored_at timestamptz not null default now()
+);
+alter table public.test_recovery_audit enable row level security;
+revoke all on public.test_recovery_audit from public, anon, authenticated;
+grant insert on public.test_recovery_audit to service_role;
+
 create or replace function public.create_test_note_with_backup(
   p_id uuid, p_owner_id uuid, p_run_id uuid,
   p_title text, p_content text, p_hash text
@@ -62,7 +75,7 @@ begin
   -- A same-ID memo of another owner MUST NOT be modified or replaced.
   insert into public.notes as n (id, owner_id, title, content)
     values (safe_copy.id, safe_copy.owner_id, safe_copy.title, safe_copy.content)
-  on conflict (id) do update
+  on conflict on constraint notes_pkey do update
     set title = excluded.title, content = excluded.content
     where n.owner_id = excluded.owner_id;
 
@@ -70,8 +83,11 @@ begin
     from public.notes as n
     where n.id = safe_copy.id and n.owner_id = safe_copy.owner_id;
   if not found then raise exception 'target_owner_mismatch'; end if;
+  insert into public.test_recovery_audit
+    (note_id, owner_id, run_id, restored_sha256)
+    values (p_id, p_owner_id, p_run_id, p_hash);
 end;
-$$;
+$;
 
 -- Functions are callable only with the server's service-role credential.
 revoke all on function public.create_test_note_with_backup(
