@@ -1,0 +1,28 @@
+name: Stage10 exact restore gateway integration
+on:
+  push:
+    branches: [stage10-restore-gate-audit-matrix]
+permissions:
+  contents: read
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exactly as stage10 bonus
+        run: npm install
+      - name: Probe restoration path
+        run: node --test test/stage10-restore-gateway.test.mjs
+      - name: Regression 1 to 10
+        if: always()
+        run: |
+          npm run test:10
+          npm run decider:test
+          npm run detect:test
+          node --test test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs test/stage3.test.mjs test/stage4.test.mjs
