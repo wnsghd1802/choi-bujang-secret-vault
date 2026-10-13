@@ -48,6 +48,7 @@ async function runStageThreeChecks(config) {
     ['anonymous_note_update', `/api/notes/${id}`, 'PUT', null],
     ['anonymous_note_delete', `/api/notes/${id}`, 'DELETE', null],
     ...(config.step >= 8 ? [['anonymous_notice_update', `/api/notices/${id}`, 'PUT', null]] : []),
+    ...(config.step >= 10 ? [['anonymous_restore', '/api/restore', 'POST', null]] : []),
     ['malformed_login_token', '/api/notes', 'GET', 'invalid.token.value'],
   ]) {
     // Invalid empty write requests cannot create a record even if authorization fails open.
