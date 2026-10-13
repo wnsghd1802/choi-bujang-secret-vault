@@ -1,3 +1,15 @@
+## 10단계 실험: 기존 B 메모 첫 수정 직전 사본 보존 (2026-10-14)
+
+- 심판 기준 최신 실제 점수: **48/100**, 실패 코드 `S10_AUDIT_DROPPED`. 아래 변경 이후 심판 점수는 아직 미확인입니다.
+- 문제가 재현된 경우: 시험 계정 B의 메모가 생성 전에 준비되어 있고 안전 사본이 없는 상태에서 첫 `PUT /api/notes/:id` 변조가 일어나면 이전 구현은 사본을 만들지 않아 복구가 `404`로 종료되고 감사 기록을 추가하지 못했습니다.
+- `migrations/014-stage10-preexisting-b-first-put.sql`은 `public.update_test_note_with_backup` RPC를 추가합니다. 해당 B 계정과 실행 번호의 정확히 한 메모에만 적용하며, 첫 B PUT과 변경 이전 행 복사를 한 트랜잭션에 실행합니다. 기존 백업은 덮어쓰지 않고, 다른 소유자 및 실행 번호는 거부합니다.
+- `src/notes-api.mjs`: 서명으로 확인된 `judge/B`의 단일 메모 `PUT`에만 이 RPC를 사용합니다. 학생·A의 CRUD 방식 및 `/api/restore`의 해시·사본·감사 검증은 유지합니다.
+- 안전성 한계: **첫 API PUT 이전에 이미 변조된 메모**라면 그 당시의 값이 저장됩니다. 직접 DB 수정이나 심판 자체 DB 쓰기를 이 RPC가 감지하지 못합니다. 그러므로 *침해 전에 검증된 사본*의 대체물이라고 단정하면 안 됩니다.
+- 검증: 별도 PostgreSQL 16, 실제 Supabase 롤백 트랜잭션에서 첫 PUT·반복 PUT·복구 및 A/다른 B/기존 감사 기록 보존. GitHub Actions: https://github.com/wnsghd1802/choi-bujang-secret-vault/actions/runs/38426429747
+- 이전 상태 복원용 브랜치: `stage10-before-first-put-eef96ea`. 운영 DB의 기존 메모를 복제·이동·삭제하지 않았습니다.
+
+---
+
 ## 10단계 — 독립 심판 DB와 학생 인증 발급자 분리 (2026-10-13)
 
 - 운영 심판의 가장 최근 실패 코드는 `S10_AUDIT_DROPPED`이고 점수는 36점, 최고 점수는 48점입니다. 이번 보완의 심판 효과는 미확인입니다.

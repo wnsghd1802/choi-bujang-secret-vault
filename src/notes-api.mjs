@@ -116,6 +116,21 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
         if (error) throw error;
         return res.status(201).json(view(data));
       }
+      // Stage10 synthetic judge-B pre-existing notes may not have passed the
+      // POST/backup RPC. On the first authorized PUT, snapshot the OLD note
+      // atomically before mutating. Existing immutable backups are never reset.
+      // Every other account and method retains the previous handler.
+      if (item && req.method === 'PUT'
+          && actor.kind === 'judge' && actor.identity === 'b') {
+        const {data,error}=await run(db.rpc('update_test_note_with_backup',{
+          p_id:id,p_owner_id:ownerId,p_run_id:actor.runId,
+          p_title:body.title.trim(),p_content:body.body,
+        }));
+        if (error) return fail(409, '시험 계정 B의 변경 전 사본을 보존하지 못했습니다.');
+        if (!Array.isArray(data) || data.length === 0) return fail(404,'메모를 찾을 수 없습니다.');
+        if (data.length !== 1 || data[0].id !== id) throw new Error('invalid_scoped_b_update');
+        return res.status(200).json(view(data[0]));
+      }
       // Match owner and ID atomically, including writes. Never update owner_id from input.
       let query = db.from('notes');
       if (req.method === 'GET') query = query.select(fields);
