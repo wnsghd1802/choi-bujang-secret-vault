@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if ([3, 4, 5, 6, 7].includes(config.step)) return runStageThreeChecks(config);
+  if ([3, 4, 5, 6, 7, 8].includes(config.step)) return runStageThreeChecks(config);
   if (config.step === 2) return runStageTwoChecks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
@@ -47,6 +47,7 @@ async function runStageThreeChecks(config) {
     ['anonymous_note_read', `/api/notes/${id}`, 'GET', null],
     ['anonymous_note_update', `/api/notes/${id}`, 'PUT', null],
     ['anonymous_note_delete', `/api/notes/${id}`, 'DELETE', null],
+    ...(config.step >= 8 ? [['anonymous_notice_update', `/api/notices/${id}`, 'PUT', null]] : []),
     ['malformed_login_token', '/api/notes', 'GET', 'invalid.token.value'],
   ]) {
     // Invalid empty write requests cannot create a record even if authorization fails open.
