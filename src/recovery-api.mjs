@@ -6,7 +6,7 @@ import config from '../aleph.config.json' with { type: 'json' };
 
 // Never allow arbitrary tables, owners, records or paths to be restored.
 export function createRecoveryHandler({ env = process.env, db: suppliedDb,
-  verifyLogin: suppliedVerifier, judgeKeySet } = {}) {
+  verifyLogin: suppliedVerifier } = {}) {
   return async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -45,12 +45,9 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
     try {
       let verifyLogin = suppliedVerifier;
       if (!verifyLogin) {
-        if (!suppliedDb && (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY)) {
-          return fail(503, '서버 인증 설정을 확인해 주세요.');
-        }
-        const studentKey = env.SUPABASE_URL === new URL(config.identityProvider.issuer).origin
-          ? env.SUPABASE_SECRET_KEY : undefined;
-        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: studentKey, judgeKeySet });
+        if (env.SUPABASE_URL !== new URL(config.identityProvider.issuer).origin
+            || !env.SUPABASE_SECRET_KEY) return fail(503, '서버 인증 설정을 확인해 주세요.');
+        verifyLogin = createLoginVerifier({ config, supabaseSecretKey: env.SUPABASE_SECRET_KEY });
       }
       phase = 'verify_identity';
       actor = await verifyLogin(authorization);

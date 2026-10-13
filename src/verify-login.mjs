@@ -42,22 +42,16 @@ function verifiedConfig(config) {
 export function createLoginVerifier({ config, supabaseSecretKey, judgeKeySet,
   supabaseClient } = {}) {
   const bound = verifiedConfig(config);
-  // Independent judge verification does not require the student's database
-  // credentials. Missing credentials must never authenticate a student.
-  const validStudentSecret = typeof supabaseSecretKey === 'string'
-    && supabaseSecretKey.trim().length > 0
-    && supabaseSecretKey === supabaseSecretKey.trim();
-  if (supabaseSecretKey !== undefined && !validStudentSecret) {
-    throw new TypeError('invalid_supabase_secret_key');
+  if (!supabaseClient && (typeof supabaseSecretKey !== 'string'
+      || !supabaseSecretKey.trim() || supabaseSecretKey !== supabaseSecretKey.trim())) {
+    throw new TypeError('missing_supabase_secret_key');
   }
   const keys = judgeKeySet ?? createRemoteJWKSet(new URL(bound.judgeJwksUrl),
     { timeoutDuration: 5000, cacheMaxAge: 5 * 60 * 1000 });
-  const supabase = supabaseClient ?? (validStudentSecret
-    ? createClient(bound.studentUrl, supabaseSecretKey, {
-      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
-    }) : null);
-  if (typeof keys !== 'function'
-      || (supabase !== null && typeof supabase?.auth?.getClaims !== 'function')) {
+  const supabase = supabaseClient ?? createClient(bound.studentUrl, supabaseSecretKey, {
+    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+  });
+  if (typeof keys !== 'function' || typeof supabase?.auth?.getClaims !== 'function') {
     throw new TypeError('invalid_login_verifier_configuration');
   }
 
@@ -85,7 +79,6 @@ export function createLoginVerifier({ config, supabaseSecretKey, judgeKeySet,
       } catch { return null; }
     }
     if (issuer === bound.studentIssuer) {
-      if (!supabase) return null;
       try {
         // Supabase verifies asymmetric keys locally through JWKS and shared-secret
         // tokens through its Auth server. Never decode and trust a student claim here.
