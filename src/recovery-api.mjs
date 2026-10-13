@@ -98,8 +98,17 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
         { id: body.id, ownerId, runId: actor.runId })) {
         return fail(409, '안전 사본 재조회 및 검증에 실패했습니다.');
       }
-      // Atomic restore, re-verification and audit append in ONE DB transaction.
-      // No potentially failing cross-request read may follow this commit.
+      // Experimental cross-request audit comparison for ISOLATED testing only.
+      // This detects an adapter returning success without audit evidence,
+      // but CANNOT rollback an already committed database restore.
+      const auditQuery = () => db.from('test_recovery_audit')
+        .select('event_id,note_id,owner_id,run_id,restored_sha256,restored_at')
+        .order('event_id');
+      phase = 'audit_before';
+      const { data: auditBefore, error: priorAuditError } = await run(auditQuery());
+      if (priorAuditError || !Array.isArray(auditBefore)) {
+        return fail(503, '감사 기록의 기존 상태를 조회하지 못했습니다.');
+      }
       phase = 'restore_rpc';
       const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_from_backup', {
         p_id: body.id, p_owner_id: ownerId, p_run_id: actor.runId,
@@ -108,6 +117,19 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       if (restoreError || !Array.isArray(restored) || restored.length !== 1
           || !validateRestoredRow(restored[0], copy)) {
         return fail(409, '시험 메모 복구가 검증되지 않았습니다.');
+      }
+      phase = 'audit_after';
+      const { data: auditAfter, error: newAuditError } = await run(auditQuery());
+      if (newAuditError || !Array.isArray(auditAfter)
+          || auditAfter.length !== auditBefore.length + 1
+          || auditBefore.some((event, index) =>
+            JSON.stringify(event) !== JSON.stringify(auditAfter[index]))
+          || auditAfter.at(-1)?.note_id !== copy.id
+          || auditAfter.at(-1)?.owner_id !== ownerId
+          || auditAfter.at(-1)?.run_id !== actor.runId
+          || auditAfter.at(-1)?.restored_sha256 !== copy.content_sha256) {
+        // This response does NOT reverse a restore RPC that already committed.
+        return fail(409, '복구 후 감사 기록의 신규 등록 또는 기존 기록 보존을 확인하지 못했습니다.');
       }
       phase = 'completed';
       trace('success', 200);

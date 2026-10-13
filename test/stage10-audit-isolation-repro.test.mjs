@@ -28,17 +28,25 @@ function fixture(mode) {
     [OTHER, {id:OTHER,owner_id:'99999999-9999-4999-8999-999999999999',
       title:'unrelated A',content:'must never change'}],
   ]);
-  const historical = {note_id: OTHER, restored_sha256: 'previous-audit-marker'};
+  const historical = {
+    event_id: 1, note_id: OTHER,
+    owner_id: '99999999-9999-4999-8999-999999999999',
+    run_id:ACTOR.runId, restored_sha256:'previous-audit-marker',
+    restored_at:'2026-10-12T09:00:00Z',
+  };
   const audit = [{...historical}];
   const db = {
     from(table) {
-      assert.equal(table,'test_note_backups');
+      assert.ok(['test_note_backups','test_recovery_audit'].includes(table));
       const conditions=[];
       const query={
         select() { return query; },
         eq(k,v) { conditions.push([k,v]); return query; },
         maybeSingle(){ return query; },
         async abortSignal(){
+          if(table==='test_recovery_audit'){
+            return {data:audit.map(row=>({...row})),error:null};
+          }
           const matches=conditions.every(([k,v])=>copy[k]===v);
           return {data:matches?{...copy}:null,error:null};
         },
@@ -56,10 +64,14 @@ function fixture(mode) {
           title:copy.title,content:copy.content,
         };
         notes.set(ID,restored);
-        if(mode==='honest') audit.push({note_id:ID,restored_sha256:copy.content_sha256});
+        const receipt = {
+          event_id:2, note_id:ID,owner_id:ownerId,run_id:ACTOR.runId,
+          restored_sha256:copy.content_sha256,restored_at:'2026-10-13T12:01:00Z',
+        };
+        if(mode==='honest') audit.push({...receipt});
         if(mode==='drop_history') {
           audit.splice(0,audit.length);
-          audit.push({note_id:ID,restored_sha256:copy.content_sha256});
+          audit.push({...receipt});
         }
         // For 'missing_new_audit' the adapter claims a successful restore
         // but silently omits the required append, as an independent fixture may.
@@ -94,20 +106,29 @@ test('control: honest injected DB restores B and retains old audit plus new rece
   assert.equal(r.notes.get(OTHER).content,'must never change');
 });
 
-test('REPRO: missing new audit still gets HTTP 200 from existing recovery handler',async()=>{
+test('PATCH: missing new audit returns 409 instead of false HTTP 200',async()=>{
   const r=await execute('missing_new_audit');
-  assert.equal(r.res.code,200);
-  assert.equal(r.res.body.restored,true);
+  assert.equal(r.res.code,409);
+  assert.equal(r.res.body.restored,undefined);
   assert.equal(r.audit.length,1);
   assert.equal(r.audit[0].restored_sha256,r.historical.restored_sha256);
-  console.log('REPRODUCED: HTTP 200 without any NEW recovery audit receipt');
+  console.log('PATCH: HTTP 409 detects missing new receipt, but the already restored B is not rolled back');
 });
 
-test('REPRO: destroyed old audit also gets HTTP 200 from existing recovery handler',async()=>{
+test('PATCH: destroyed historical audit returns 409 instead of false HTTP 200',async()=>{
   const r=await execute('drop_history');
-  assert.equal(r.res.code,200);
+  assert.equal(r.res.code,409);
   assert.equal(r.audit.length,1);
   assert.notEqual(r.audit[0].restored_sha256,r.historical.restored_sha256);
   assert.equal(r.notes.get(OTHER).content,'must never change');
-  console.log('REPRODUCED: HTTP 200 although historical recovery audit was dropped');
+  console.log('PATCH: HTTP 409 detects deleted historical receipt, but DB mutation already occurred');
+});
+
+test('LIMITATION: post-commit audit checks cannot undo the restored B after HTTP 409',async()=>{
+  for(const mode of ['missing_new_audit','drop_history']){
+    const r=await execute(mode);
+    assert.equal(r.res.code,409);
+    assert.equal(r.notes.get(ID).content,SAFE_CONTENT,
+      'B was already changed by RPC before the audit check rejected the response');
+  }
 });
