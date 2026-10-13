@@ -264,3 +264,27 @@ test('legacy owner compatibility rejects an unverified foreign owner and never c
   assert.equal(db.audits.length,0);
   assert.equal(db.notes.get(B_ID).content,'corrupt');
 });
+
+test('legacy sub mapping refuses a snapshot marked identity a, preserving the tampered note',async()=>{
+  const db=fakeDb(),token=await issue('b');
+  db.notes.set(B_ID,{id:B_ID,owner_id:USER,title:'attacked',content:'corrupted B'});
+  db.backups.set(B_ID,{id:B_ID,owner_id:USER,run_id:RUN,identity:'a',
+    title:'A private',content:'some other account',content_sha256:contentDigest('some other account')});
+  const res=response();
+  await createRecoveryHandler({db,verifyLogin})(request('POST','/api/restore',token,{id:B_ID}),res);
+  assert.equal(res.code,409);
+  assert.equal(db.notes.get(B_ID).content,'corrupted B');
+  assert.equal(db.audits.length,0);
+});
+
+test('legacy sub mapping refuses a snapshot with an incorrect content digest',async()=>{
+  const db=fakeDb(),token=await issue('b');
+  db.notes.set(B_ID,{id:B_ID,owner_id:USER,title:'attacked',content:'corrupted B'});
+  db.backups.set(B_ID,{id:B_ID,owner_id:USER,run_id:RUN,identity:'b',
+    title:'B safe',content:'verified prior state',content_sha256:'0'.repeat(64)});
+  const res=response();
+  await createRecoveryHandler({db,verifyLogin})(request('POST','/api/restore',token,{id:B_ID}),res);
+  assert.equal(res.code,409);
+  assert.equal(db.notes.get(B_ID).content,'corrupted B');
+  assert.equal(db.audits.length,0);
+});
