@@ -1,7 +1,7 @@
 name: Stage10 backed-up B identity mutation recovery (isolated)
 on:
   push:
-    branches: [main, stage10-owner-id-integrity-proof, stage10-prechange-snapshot-experiment]
+    branches: [main, stage10-owner-id-integrity-proof]
 permissions:
   contents: read
 jobs:
