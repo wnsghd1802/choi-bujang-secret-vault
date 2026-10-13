@@ -48,7 +48,7 @@ function fakeDb(){
           backups.set(row.id,{...row,run_id:p.p_run_id,identity:'b',content_sha256:p.p_hash});
           return {error:null,data:[row]};
         }
-        if(name==='restore_test_note_with_receipt'){
+        if(name==='restore_test_note_with_lineage'){
           const copy=backups.get(p.p_id),present=notes.get(p.p_id);
           if(!copy || copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id
             || copy.content_sha256!==p.p_hash || copy.content_sha256!==contentDigest(copy.content)
@@ -143,7 +143,7 @@ test('backup changed after first API read but before database restore cannot mod
   const db=fakeDb();await createB(db);
   const originalRpc=db.rpc.bind(db);
   db.rpc=(name,args)=>{
-    if(name==='restore_test_note_with_receipt'){
+    if(name==='restore_test_note_with_lineage'){
       // Simulates an attacker changing the snapshot between API check and RPC.
       db.backups.get(B_ID).content='corrupt during verification';
     }
@@ -164,7 +164,7 @@ test('backup changed on the API second read prevents all writes and preserves au
   const originalRpc=db.rpc.bind(db);
   let restoreCalls=0;
   db.rpc=(name,args)=>{
-    if(name==='restore_test_note_with_receipt')restoreCalls++;
+    if(name==='restore_test_note_with_lineage')restoreCalls++;
     return originalRpc(name,args);
   };
   const from=db.from.bind(db);
@@ -266,7 +266,7 @@ test('never accept a note-only RPC response that lacks audit persistence receipt
  db.notes.get(B_ID).content='attacked';
  const originalRpc=db.rpc.bind(db);
  db.rpc=(name,args)=>{
-   if(name==='restore_test_note_with_receipt'||name==='restore_test_note_with_receipt'){
+   if(name==='restore_test_note_with_lineage'||name==='restore_test_note_with_lineage'){
       const safe=db.backups.get(B_ID);
       return {async abortSignal(){
         return {error:null,data:[{id:safe.id,owner_id:safe.owner_id,title:safe.title,content:safe.content}]};
@@ -278,4 +278,23 @@ test('never accept a note-only RPC response that lacks audit persistence receipt
  assert.equal(response.code,409,'missing receipt must not get HTTP 200');
  assert.equal(db.audit.length,0);
  assert.equal(db.notes.get(B_ID).content,'attacked');
+});
+
+test('owner or ID mutation cannot use a forged caller-supplied identity to restore unrelated notes',async()=>{
+ const db=fakeDb();await createB(db);
+ const original={...db.notes.get(B_ID)};
+ const unrelated={id:A_ID,owner_id:noteOwnerId(A),title:'Separate A',content:'no change'};
+ db.notes.set(A_ID,{...unrelated});
+ db.audit.push({note_id:A_ID,kind:'existing_history'});
+ const auditBefore=structuredClone(db.audit);
+ // With no internal DB-backed tuple provenance, a bare owner mismatch is
+ // indistinguishable from a different owner's row with the same UUID.
+ db.notes.get(B_ID).owner_id=noteOwnerId(A);
+ const denied=await restore(db);
+ assert.equal(denied.code,409);
+ assert.deepEqual(db.audit,auditBefore);
+ assert.deepEqual(db.notes.get(A_ID),unrelated);
+ // Without a trustworthy lineage record, a changed primary key cannot be
+ // guessed from the note body; no caller-provided moved ID is accepted.
+ assert.equal(db.backups.get(B_ID).owner_id,original.owner_id);
 });

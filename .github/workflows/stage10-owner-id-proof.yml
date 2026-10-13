@@ -1,0 +1,55 @@
+name: Stage10 backed-up B identity mutation recovery (isolated)
+on:
+  push:
+    branches: [main, stage10-owner-id-integrity-proof]
+permissions:
+  contents: read
+jobs:
+  verified-lineage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Stage10 self checks including foreign-owner rejection
+        run: npm run test:10
+      - name: Previous-stage regression and policies
+        run: |
+          npm run policy:check
+          npm run decider:test
+          npm run detect:test
+          node --test test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs test/stage3.test.mjs test/stage4.test.mjs
+      - name: Independent PostgreSQL B id/owner mutation and audit preservation
+        env:
+          PGPASSWORD: synthetic-only
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGDATABASE: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-owner-id-schema.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/010-test-recovery.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/010-verify-backup.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/011-immutable-stage10-history.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/012-stage10-evidence-permissions.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/013-stage10-audit-reverification.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/015-stage10-atomic-audit-receipt.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/016-stage10-b-row-lineage.sql
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-owner-id-matrix.sql

@@ -75,7 +75,7 @@ test('gateway-to-restore completes precisely one B restoration, preserving A, B2
      }};
    return q;
   },
-  rpc(name,params){assert.equal(name,'restore_test_note_with_receipt');
+  rpc(name,params){assert.equal(name,'restore_test_note_with_lineage');
    return {async abortSignal(){
     if(params.p_id!==id||params.p_owner_id!==ownerB||params.p_run_id!==run||
        params.p_hash!==safe.content_sha256) return {data:null,error:{code:'wrong_target'}};
