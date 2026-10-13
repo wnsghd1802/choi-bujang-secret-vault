@@ -25,9 +25,10 @@ jobs:
       - run: npm run detect:test
       - name: Current stage 7/8/9 contract regression
         run: node --test test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs
-      - name: Legacy stage 3 compatibility report (known old fixture assumptions)
-        continue-on-error: true
+      - name: Stage 3-5 signed access and isolation regression (mandatory)
         run: node --test test/stage3.test.mjs
+      - name: Stage 4 full previous-stage security matrix (mandatory)
+        run: node --test test/stage4.test.mjs
       - name: Prepare local-only stage 10 submission notes
         run: |
           node --input-type=module <<'NODE'

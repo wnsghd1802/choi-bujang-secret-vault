@@ -4,6 +4,7 @@ import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT, jwtVerify } fro
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { createNotesHandler } from '../src/notes-api.mjs';
 import { noteOwnerId } from '../src/note-owner.mjs';
+import { contentDigest } from '../src/recovery-core.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -26,12 +27,19 @@ async function token(overrides = {}, privateKey = key.privateKey) {
     .setProtectedHeader({alg:'ES256'}).sign(privateKey);
 }
 const good = await token();
-const request = (method, body, id, jwt = good) => ({ method, body, query: {id}, headers: jwt ? {authorization:`Bearer ${jwt}`} : {} });
+// Match the real collection/item URL and query parsing contracts.
+const request = (method, body, id, jwt = good) => {
+  const isItem = id !== null && id !== undefined;
+  return { method, body, url: isItem ? '/api/notes/' + id : '/api/notes',
+    query: isItem ? {id} : {},
+    headers: jwt ? {authorization:`Bearer ${jwt}`} : {} };
+};
 function response() { return {headers:{}, setHeader(k,v){this.headers[k]=v;}, status(code){this.code=code;return this;},json(body){this.body=body;return this;}}; }
 function fakeDb(initial = []) {
   const rows = structuredClone(initial);
   let calls=0;
-  return { rows, get calls(){return calls;}, from(table) {
+  const backups=[];
+  return { rows, backups, get calls(){return calls;}, from(table) {
     assert.equal(table,'notes'); calls++;
     let action='select', values, mode, filter=[];
     const query={ select(){return query;},order(){return query;},eq(k,v){filter.push([k,v]);return query;},
@@ -49,6 +57,25 @@ function fakeDb(initial = []) {
         return {data:mode ? (result[0]??null) : result,error:null};
       }
     };return query;
+  },
+  // Judge B now uses an atomic create-with-private-backup RPC instead of a raw insert.
+  // Reproduce that current contract inside this disposable in-memory fixture.
+  rpc(name, p) {
+    assert.equal(name, 'create_test_note_with_backup');
+    return {async abortSignal() {
+      if (typeof p.p_id !== 'string' || typeof p.p_owner_id !== 'string'
+          || typeof p.p_run_id !== 'string' || !p.p_title
+          || p.p_hash !== contentDigest(p.p_content)) {
+        return {data:null,error:{code:'invalid_private_backup'}};
+      }
+      if (rows.some(row=>row.id===p.p_id) || backups.some(row=>row.id===p.p_id)) {
+        return {data:null,error:{code:'23505'}};
+      }
+      const note={id:p.p_id,owner_id:p.p_owner_id,title:p.p_title,content:p.p_content};
+      rows.push(note);
+      backups.push({...note,run_id:p.p_run_id,identity:'b',content_sha256:p.p_hash});
+      return {data:[{...note}],error:null};
+    }};
   }};
 }
 
@@ -88,7 +115,7 @@ test('CRUD uses verified owner, returns required shapes, lists own notes and del
   assert.equal(res.body.length,1); assert.equal(res.body[0].id,id);
   res=response(); await item(request('GET',null,id),res); assert.equal(res.code,200);
   res=response(); await item(request('PUT',{title:'updated',body:'updated'},id),res);
-  assert.equal(res.body.body,'updated'); assert.equal(db.rows.find(r=>r.id===id).owner_id,A);
+  assert.equal(res.body.body,'updated'); assert.equal(db.rows.find(r=>r.id===id).owner_id,noteOwnerId(await verifier(`Bearer ${good}`)));
   res=response(); await item(request('DELETE',null,id),res); assert.equal(res.body.deleted,true);
   res=response(); await item(request('GET',null,id),res); assert.equal(res.code,404);
   // Stage 4: known IDs of other owners are protected as well.
@@ -156,6 +183,8 @@ test('judge identities a/b with same verified sub and run cannot share notes', a
   const r2 = response();
   await list(request('POST', { title: 'b note', body: 'synthetic' }, null, bToken), r2);
   assert.equal(r2.code, 201);
+  assert.equal(db.backups.length, 1, 'only judge B creates a private backup');
+  assert.equal(db.backups[0].content_sha256, contentDigest('synthetic'));
   const idB = r2.body.id;
   const ownerA = db.rows.find(row => row.id === idA).owner_id;
   const ownerB = db.rows.find(row => row.id === idB).owner_id;
