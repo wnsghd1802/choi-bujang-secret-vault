@@ -92,15 +92,18 @@ export function createNotesHandler({ item = false, env = process.env, db: suppli
         // Snapshot synthetic judge-B notes in the SAME database transaction as
         // creation. No student data or judge-A data is copied or changed.
         if (actor.kind === 'judge' && actor.identity === 'b') {
+          console.info('[S10_TRACE] judge_b_create result=received');
           const { data, error } = await run(db.rpc('create_test_note_with_backup', {
             p_id: id, p_owner_id: ownerId, p_run_id: actor.runId,
             p_title: body.title.trim(), p_content: body.body,
             p_hash: contentDigest(body.body),
           }));
-          if (error?.code === '23505') return fail(409, '이미 사용 중인 메모 ID입니다.');
+          if (error?.code === '23505') { console.info('[S10_TRACE] judge_b_create result=duplicate'); return fail(409, '이미 사용 중인 메모 ID입니다.'); }
           if (error || !Array.isArray(data) || data.length !== 1 || data[0].id !== id) {
+            console.info('[S10_TRACE] judge_b_create result=snapshot_error');
             throw new Error('private_test_snapshot_unavailable');
           }
+          console.info('[S10_TRACE] judge_b_create result=snapshot_created');
           return res.status(201).json(view(data[0]));
         }
         const { data, error } = await run(db.from('notes').insert({ id, title: body.title.trim(),
