@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT, jwtVerify } from 'jose';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { createNotesHandler } from '../src/notes-api.mjs';
+import { noteOwnerId } from '../src/note-owner.mjs';
 import config from '../aleph.config.json' with { type: 'json' };
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -82,7 +83,7 @@ test('CRUD uses verified owner, returns required shapes, lists own notes and del
   assert.match(res.body.id,/^[a-f0-9-]{36}$/);
   assert.deepEqual(Object.keys(res.body).sort(),['body','id','title']);
   const id=res.body.id;
-  assert.equal(db.rows.find(r=>r.id===id).owner_id,A);
+  assert.equal(db.rows.find(r=>r.id===id).owner_id,noteOwnerId(await verifier(`Bearer ${good}`)));
   res=response(); await collection(request('GET'),res);
   assert.equal(res.body.length,1); assert.equal(res.body[0].id,id);
   res=response(); await item(request('GET',null,id),res); assert.equal(res.code,200);
@@ -140,4 +141,43 @@ test('both owners keep CRUD, cannot read/update/delete each other, and cannot tr
     let res=response();await item(request('DELETE',null,ids[i],tokens[i]),res);assert.equal(res.code,200);
     res=response();await item(request('GET',null,ids[i],tokens[i]),res);assert.equal(res.code,404);
   }
+});
+
+test('judge identities a/b with same verified sub and run cannot share notes', async () => {
+  const db = fakeDb();
+  const list = createNotesHandler({ db, verifyLogin: verifier });
+  const item = createNotesHandler({ item: true, db, verifyLogin: verifier });
+  const aToken = good;
+  const bToken = await token({ aleph_identity: 'b' }); // Same sub and aleph_run.
+  const r1 = response();
+  await list(request('POST', { title: 'a note', body: 'synthetic' }, null, aToken), r1);
+  assert.equal(r1.code, 201);
+  const idA = r1.body.id;
+  const r2 = response();
+  await list(request('POST', { title: 'b note', body: 'synthetic' }, null, bToken), r2);
+  assert.equal(r2.code, 201);
+  const idB = r2.body.id;
+  const ownerA = db.rows.find(row => row.id === idA).owner_id;
+  const ownerB = db.rows.find(row => row.id === idB).owner_id;
+  assert.notEqual(ownerA, ownerB);
+  assert.equal(ownerA, noteOwnerId(await verifier(`Bearer ${aToken}`)));
+  assert.equal(ownerB, noteOwnerId(await verifier(`Bearer ${bToken}`)));
+  for (const [active, own, other] of [[aToken,idA,idB],[bToken,idB,idA]]) {
+    const ownRes = response();
+    await item(request('GET', null, own, active), ownRes);
+    assert.equal(ownRes.code, 200);
+    const listRes = response();
+    await list(request('GET', null, null, active), listRes);
+    assert.deepEqual(listRes.body.map(row => row.id), [own]);
+    for (const method of ['GET','PUT','DELETE']) {
+      const denied = response();
+      await item(request(method, { title:'wrong', body:'wrong' }, other, active), denied);
+      assert.equal(denied.code, 404);
+    }
+  }
+});
+
+test('student owner key remains original verified user UUID', () => {
+  assert.equal(noteOwnerId({ kind: 'student', userId: A }), A);
+  assert.equal(noteOwnerId({ kind: 'judge', userId: A, runId: RUN, identity: 'x' }), null);
 });
