@@ -61,6 +61,22 @@ function fakeDb(initial = []) {
   // Judge B now uses an atomic create-with-private-backup RPC instead of a raw insert.
   // Reproduce that current contract inside this disposable in-memory fixture.
   rpc(name, p) {
+    if(name==='update_test_note_with_backup'){
+      return {async abortSignal(){
+        const found=rows.find(row=>row.id===p.p_id && row.owner_id===p.p_owner_id);
+        if(!found)return {data:[],error:null};
+        const copy=backups.find(row=>row.id===p.p_id);
+        if(copy){
+          if(copy.owner_id!==p.p_owner_id || copy.run_id!==p.p_run_id ||
+             copy.identity!=='b'||copy.content_sha256!==contentDigest(copy.content))
+            return {data:null,error:{code:'backup_mismatch'}};
+        }else backups.push({...found,run_id:p.p_run_id,identity:'b',
+          content_sha256:contentDigest(found.content)});
+        found.title=p.p_title;
+        found.content=p.p_content;
+        return {data:[{...found}],error:null};
+      }};
+    }
     assert.equal(name, 'create_test_note_with_backup');
     return {async abortSignal() {
       if (typeof p.p_id !== 'string' || typeof p.p_owner_id !== 'string'
