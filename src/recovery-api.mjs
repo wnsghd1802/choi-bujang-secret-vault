@@ -55,8 +55,9 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
 
     // Stage 10 only: verified judge-B synthetic notes, never real students,
     // judge-A records, arbitrary user IDs or public backup endpoints.
+    if (!actor) return fail(401, '로그인이 만료되었거나 유효하지 않습니다.');
     phase = 'judge_b_scope';
-    if (!actor || actor.kind !== 'judge' || actor.identity !== 'b'
+    if (actor.kind !== 'judge' || actor.identity !== 'b'
         || !isValidRestoreId(actor.runId)) return fail(403, '시험 계정 B만 복구할 수 있습니다.');
     const ownerId = noteOwnerId(actor);
     if (!ownerId) return fail(403, '소유자를 검증하지 못했습니다.');
