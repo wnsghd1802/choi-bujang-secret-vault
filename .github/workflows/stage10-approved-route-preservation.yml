@@ -17,10 +17,12 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node --test test/stage10-approved-route-preservation.test.mjs
-      - name: Earlier policy regressions
-        if: always()
+      - name: New route preservation and complete stage10 regression
+        run: npm run test:10
+      - name: Original policy checkpoint read-only check
+        run: npm run policy:check
+      - name: Previous-stage contract suite
         run: |
-          npm run test:10
           npm run decider:test
           npm run detect:test
+          node --test test/step7.test.mjs test/step8.test.mjs test/step8-judge-isolation.test.mjs test/step9.test.mjs test/stage3.test.mjs test/stage4.test.mjs
