@@ -8,6 +8,33 @@ import { describePolicyDiff } from './policy-diff.mjs';
 // service rule; allow its existing modifications but never overwrite them.
 const TARGETS = Object.freeze(['src/decider.mjs']);
 const PRESERVE_ONLY = Object.freeze(['src/detect.mjs']);
+
+// The stage-9 checkpoint predates one legitimate stage-10 route. Trust ONLY
+// this exact addition; all other committed changes must be reviewed separately.
+const STAGE9_NOTE_GUARD = `  // No collection reads, exports, notice writes or class/instructor resources.
+  if (request.method !== 'GET' && request.method !== 'PUT') return false;`;
+const APPROVED_STAGE10_NOTE_GUARD = `  // New stage-10 operation: this exact route reaches the RESTORE handler,
+  // which separately enforces a signed judge-B identity and a single safe note.
+  // No other collection POST, DELETE, aliases, query selectors or exports pass.
+  if (request.method === 'POST' && request.route === 'POST /api/restore'
+      && request.path === '/api/restore') return true;
+
+  // Older per-note ownership policy remains unchanged.
+  if (request.method !== 'GET' && request.method !== 'PUT') return false;`;
+
+function trustedPolicyTarget(path, checkpointBytes, headBytes) {
+  if (checkpointBytes.equals(headBytes)) return checkpointBytes;
+  if (path !== 'src/decider.mjs') throw new Error('policy_head_contains_unreviewed_changes');
+  const text = checkpointBytes.toString('utf8');
+  if (text.indexOf(STAGE9_NOTE_GUARD) < 0
+      || text.indexOf(STAGE9_NOTE_GUARD) !== text.lastIndexOf(STAGE9_NOTE_GUARD)) {
+    throw new Error('policy_head_contains_unreviewed_changes');
+  }
+  const approved = Buffer.from(
+    text.replace(STAGE9_NOTE_GUARD, APPROVED_STAGE10_NOTE_GUARD), 'utf8');
+  if (!approved.equals(headBytes)) throw new Error('policy_head_contains_unreviewed_changes');
+  return approved;
+}
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const git = (root, ...args) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 1024,
@@ -62,14 +89,19 @@ export async function runPolicyRecovery({ root, checkpoint, apply = false,
     && [...TARGETS, ...PRESERVE_ONLY].includes(entry.slice(3)));
   output(`검증된 안전 정책 버전: ${checkpoint}\n현재 작업 버전: ${head}\n`);
   output('보존 대상 다른 서비스 규칙: src/detect.mjs (복구·덮어쓰기 제외)\n');
+  output('9단계 검증본과 일치하거나, 승인된 10단계 복구 경로만 추가된 버전만 복원합니다.\n');
   const entries = [];
   for (const path of TARGETS) {
     const filename = join(root, path);
     const details = await lstat(filename);
     if (!details.isFile() || details.isSymbolicLink()) throw new Error('policy_target_not_regular_file');
-    const verified = execFileSync('git', ['show', `${checkpoint}:${path}`], {
+    const safeStage9 = execFileSync('git', ['show', `${checkpoint}:${path}`], {
       cwd: root, timeout: 5000, maxBuffer: 1024 * 1024,
     });
+    const approvedHead = execFileSync('git', ['show', `HEAD:${path}`], {
+      cwd: root, timeout: 5000, maxBuffer: 1024 * 1024,
+    });
+    const verified = trustedPolicyTarget(path, safeStage9, approvedHead);
     const current = await readFile(filename);
     entries.push({ path, filename, verified, current,
       mode: (await stat(filename)).mode, changed: !verified.equals(current) });
@@ -109,9 +141,13 @@ export async function runPolicyRecovery({ root, checkpoint, apply = false,
   // Re-read the trusted version from Git as well, rather than relying solely
   // on the earlier preview's in-memory copy.
   for (const e of entries) {
-    const verifiedAgain = execFileSync('git', ['show', `${checkpoint}:${e.path}`], {
+    const stage9Again = execFileSync('git', ['show', `${checkpoint}:${e.path}`], {
       cwd: root, timeout: 5000, maxBuffer: 1024 * 1024,
     });
+    const headAgain = execFileSync('git', ['show', `HEAD:${e.path}`], {
+      cwd: root, timeout: 5000, maxBuffer: 1024 * 1024,
+    });
+    const verifiedAgain = trustedPolicyTarget(e.path, stage9Again, headAgain);
     if (!verifiedAgain.equals(e.verified)) throw new Error('policy_verified_version_changed');
   }
   // Refuse stale approval if any policy changed after we computed the preview.
