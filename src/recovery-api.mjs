@@ -74,17 +74,9 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       if (!verifyPrivateCopy(copy, { id: body.id, ownerId, runId: actor.runId })) {
         return fail(409, '사본 ID·소유자·내용 해시 검증에 실패했습니다.');
       }
-      // Atomic single-ID transaction inside the database, not a bulk overwrite.
-      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_from_backup', {
-        p_id: body.id, p_owner_id: ownerId, p_run_id: actor.runId,
-        p_hash: copy.content_sha256,
-      }));
-      if (restoreError || !Array.isArray(restored) || restored.length !== 1
-          || !validateRestoredRow(restored[0], copy)) {
-        return fail(409, '시험 메모 복구가 검증되지 않았습니다.');
-      }
-      // Re-read the source backup after the atomic restore. The DB RPC has
-      // independently verified this same snapshot INSIDE its transaction.
+      // Final API snapshot re-read happens BEFORE any mutation. If this check
+      // fails we must not restore the note or append an audit event. The RPC
+      // independently re-verifies and restores atomically in the database.
       const { data: copyAgain, error: rereadError } = await run(db.from('test_note_backups')
         .select('id,owner_id,run_id,identity,title,content,content_sha256')
         .eq('id', body.id).eq('owner_id', ownerId).eq('run_id', actor.runId).maybeSingle());
@@ -92,11 +84,15 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
         { id: body.id, ownerId, runId: actor.runId })) {
         return fail(409, '안전 사본 재조회 및 검증에 실패했습니다.');
       }
-      const { data: checked, error: checkError } = await run(db.from('notes')
-        .select('id,owner_id,title,content').eq('id', body.id)
-        .eq('owner_id', ownerId).maybeSingle());
-      if (checkError || !validateRestoredRow(checked, copy)) {
-        return fail(503, '복구 후 검증을 완료하지 못했습니다.');
+      // Atomic restore, re-verification and audit append in ONE DB transaction.
+      // No potentially failing cross-request read may follow this commit.
+      const { data: restored, error: restoreError } = await run(db.rpc('restore_test_note_from_backup', {
+        p_id: body.id, p_owner_id: ownerId, p_run_id: actor.runId,
+        p_hash: copy.content_sha256,
+      }));
+      if (restoreError || !Array.isArray(restored) || restored.length !== 1
+          || !validateRestoredRow(restored[0], copy)) {
+        return fail(409, '시험 메모 복구가 검증되지 않았습니다.');
       }
       return res.status(200).json({ id: copy.id, restored: true, verified: true,
         contentSha256: copy.content_sha256 });

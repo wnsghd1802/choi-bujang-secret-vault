@@ -82,6 +82,8 @@ test('verified judge-B creation makes separate immutable test backup',async()=>{
 });
 test('altered B restores exactly one record; A and previous audit preserved',async()=>{
   const db=fakeDb();await createB(db);
+  db.audit.push({id:A_ID,kind:'existing_event'});
+  const previousAudit=structuredClone(db.audit[0]);
   db.notes.set(A_ID,{id:A_ID,owner_id:noteOwnerId(A),title:'A safe',content:'unchanged'});
   const before=structuredClone(db.notes.get(A_ID));
   db.notes.get(B_ID).content='corrupted';
@@ -89,7 +91,8 @@ test('altered B restores exactly one record; A and previous audit preserved',asy
   assert.equal(res.code,200);assert.equal(res.body.verified,true);
   assert.equal(db.notes.get(B_ID).content,'original synthetic content');
   assert.deepEqual(db.notes.get(A_ID),before);
-  assert.equal(db.audit.length,1);
+  assert.equal(db.audit.length,2);
+  assert.deepEqual(db.audit[0],previousAudit);
 });
 test('deleted test-B note can be recovered without touching another note',async()=>{
   const db=fakeDb();await createB(db);db.notes.delete(B_ID);
@@ -150,8 +153,18 @@ test('backup changed after first API read but before database restore cannot mod
   assert.equal(db.notes.get(B_ID).content,'already tampered');
   assert.equal(db.audit.length,0);
 });
-test('API re-reads backup after recovery; changes on second read fail verification',async()=>{
+test('backup changed on the API second read prevents all writes and preserves audit',async()=>{
   const db=fakeDb();await createB(db);
+  db.notes.get(B_ID).content='already tampered';
+  const noteBefore=structuredClone(db.notes.get(B_ID));
+  db.audit.push({id:A_ID,kind:'existing_event'});
+  const auditBefore=structuredClone(db.audit);
+  const originalRpc=db.rpc.bind(db);
+  let restoreCalls=0;
+  db.rpc=(name,args)=>{
+    if(name==='restore_test_note_from_backup')restoreCalls++;
+    return originalRpc(name,args);
+  };
   const from=db.from.bind(db);
   let backupReads=0;
   db.from=table=>{
@@ -171,4 +184,7 @@ test('API re-reads backup after recovery; changes on second read fail verificati
   const res=await restore(db);
   assert.equal(backupReads,2);
   assert.equal(res.code,409);
+  assert.equal(restoreCalls,0,'no restore transaction after failed backup re-read');
+  assert.deepEqual(db.notes.get(B_ID),noteBefore);
+  assert.deepEqual(db.audit,auditBefore);
 });
