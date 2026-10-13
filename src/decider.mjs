@@ -21,8 +21,7 @@ function resourceScope(request) {
       && request.classId === 'class_fixture'
       && request.projectId === 'project_fixture'
       && request.subjectId === 'learner_fixture'
-      && request.deviceId === 'aaaaaaaaaaaaaaaa'
-      && request.signals?.source === 'judge_fixture') return 'synthetic_practice';
+      && request.deviceId === 'aaaaaaaaaaaaaaaa') return 'synthetic_practice';
 
   // Individual notes, notices, alternative methods, query selectors and
   // unknown routes fail closed without engine-verified resource ownership.
