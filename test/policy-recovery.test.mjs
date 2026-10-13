@@ -75,6 +75,20 @@ test('restoring the reviewed plan re-denies forbidden reads, retains normal read
   assert.ok(restored.backupDir);
   const oldDecider=await readFile(join(restored.backupDir,'src__decider.mjs.before'),'utf8');
   assert.equal(oldDecider,breachedDecider);
+  // A successful policy restore must produce a separate verified audit receipt
+  // without changing historical audit data or touching another service policy.
+  const receiptBytes=await readFile(restored.auditReceipt);
+  const receipt=JSON.parse(receiptBytes.toString('utf8'));
+  assert.equal(receipt.schema,'aleph.policy.restore.audit.v1');
+  assert.equal(receipt.action,'verified_policy_restore');
+  assert.equal(receipt.checkpoint,f.checkpoint);
+  assert.equal(receipt.approvedPlanSha256,earlier.plan);
+  assert.equal(receipt.changes.length,1);
+  assert.equal(receipt.changes[0].path,'src/decider.mjs');
+  assert.match(receipt.changes[0].previousSha256,/^[a-f0-9]{64}$/u);
+  assert.match(receipt.changes[0].restoredSha256,/^[a-f0-9]{64}$/u);
+  assert.match(restored.auditSha256,/^[a-f0-9]{64}$/u);
+  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit event\\n'.replace('\\n','\n'));
 });
 
 test('a stale review is rejected before modifying policy or audit',async t=>{

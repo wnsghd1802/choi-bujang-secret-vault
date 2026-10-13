@@ -155,18 +155,44 @@ export async function runPolicyRecovery({ root, checkpoint, apply = false,
     if (!(await readFile(e.filename)).equals(e.current)) throw new Error('restore_target_changed_during_review');
   }
   const replaced = [];
+  // A per-operation audit receipt is additive. It does not replace or truncate
+  // any preexisting audit file, modify the DB, or touch unrelated service rules.
+  const auditReceipt = join(backupDir, 'policy-restore-event.json');
+  let auditSha256;
   try {
     for (const e of changed) {
       await atomicReplace(e.filename, e.verified, e.mode);
       replaced.push(e);
       if (!(await readFile(e.filename)).equals(e.verified)) throw new Error('restore_post_write_mismatch');
     }
+    const event = {
+      schema: 'aleph.policy.restore.audit.v1',
+      eventId: randomUUID(),
+      action: 'verified_policy_restore',
+      at: new Date().toISOString(),
+      checkpoint,
+      sourceHead: head,
+      approvedPlanSha256: plan,
+      changes: changed.map(e => ({
+        path: e.path, previousSha256: digest(e.current), restoredSha256: digest(e.verified),
+      })),
+    };
+    const bytes = Buffer.from(JSON.stringify(event) + '\n', 'utf8');
+    await writeFile(auditReceipt, bytes, { flag: 'wx', mode: 0o600 });
+    // Successful policy restoration requires a written and re-read audit
+    // receipt. If it cannot be persisted, revert the policy in this process.
+    const saved = await readFile(auditReceipt);
+    if (!saved.equals(bytes)) throw new Error('policy_audit_receipt_reverification_failed');
+    auditSha256 = digest(saved);
   } catch (error) {
-    // Never erase the pre-restore snapshots. Revert only the files this invocation replaced.
+    // Keep pre-restore snapshots, but do not retain a misleading success receipt.
+    await rm(auditReceipt, { force: true });
     for (const e of replaced.reverse()) await atomicReplace(e.filename, e.current, e.mode);
     throw error;
   }
   output(`검증된 정책 복원 완료: ${changed.map(e => e.path).join(', ')}\n`);
+  output(`복구 감사 영수증 SHA256: ${auditSha256}\n`);
   output('기존 감사 기록·DB·다른 서비스 규칙은 수정하지 않았습니다. Git diff와 정상·금지 요청을 확인하고 커밋하세요.\n');
-  return { plan, changed: changed.map(e => e.path), applied: true, backupDir };
+  return { plan, changed: changed.map(e => e.path), applied: true,
+    backupDir, auditReceipt, auditSha256 };
 }
