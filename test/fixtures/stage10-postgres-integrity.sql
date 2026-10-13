@@ -14,6 +14,15 @@ CREATE TRIGGER isolated_suppress_audit
   BEFORE INSERT ON public.test_recovery_audit
   FOR EACH ROW EXECUTE FUNCTION public.isolated_suppress_audit();
 
+-- Proven after migrations: server can retrieve its own audit receipt, but
+-- users cannot browse the private audit. No artificial grants in this fixture.
+DO $grant_test$
+BEGIN
+  IF NOT has_table_privilege('service_role','public.test_recovery_audit','SELECT')
+      OR has_table_privilege('anon','public.test_recovery_audit','SELECT')
+      OR has_table_privilege('authenticated','public.test_recovery_audit','SELECT')
+  THEN RAISE EXCEPTION 'audit_grant_mismatch'; END IF;
+END $grant_test$;
 SET LOCAL ROLE service_role;
 DO $test$
 DECLARE

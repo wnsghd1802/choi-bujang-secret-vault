@@ -41,7 +41,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f migrations/011-immutable-stage10-history.sql
           psql -v ON_ERROR_STOP=1 -f migrations/012-stage10-evidence-permissions.sql
           psql -v ON_ERROR_STOP=1 -f migrations/013-stage10-audit-reverification.sql
-          # Supabase's service_role has audit SELECT by default; the standalone
-          # PostgreSQL fixture has no implicit grants, so reproduce that scope.
-          psql -v ON_ERROR_STOP=1 -c 'GRANT SELECT ON public.test_recovery_audit TO service_role;'
           psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-postgres-integrity.sql

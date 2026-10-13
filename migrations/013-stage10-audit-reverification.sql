@@ -79,6 +79,11 @@ begin
 end;
 $func$;
 
+-- The caller must be able to read the receipt again in the SAME transaction.
+-- A fresh isolated DB does not inherit Supabase-managed service_role grants.
+-- Other roles keep their direct audit table access denied.
+grant select on public.test_recovery_audit to service_role;
+
 -- Verify privilege scope remains server-only.
 revoke all on function public.restore_test_note_from_backup(
   uuid,uuid,uuid,text) from public, anon, authenticated;
