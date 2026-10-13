@@ -4,7 +4,10 @@ import { lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/pro
 import { dirname, join } from 'node:path';
 import { describePolicyDiff } from './policy-diff.mjs';
 
-const TARGETS = Object.freeze(['src/decider.mjs', 'src/detect.mjs']);
+// Only the test policy is restored. The stage-9 detector is a different
+// service rule; allow its existing modifications but never overwrite them.
+const TARGETS = Object.freeze(['src/decider.mjs']);
+const PRESERVE_ONLY = Object.freeze(['src/detect.mjs']);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const git = (root, ...args) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 1024 * 1024,
@@ -56,8 +59,9 @@ export async function runPolicyRecovery({ root, checkpoint, apply = false,
   // -z entries are unquoted, and rename/copy entries have a second NUL path.
   const safeToApply = status.every(entry => entry.length >= 4
     && entry[0] === ' ' && [' ', 'M'].includes(entry[1])
-    && TARGETS.includes(entry.slice(3)));
+    && [...TARGETS, ...PRESERVE_ONLY].includes(entry.slice(3)));
   output(`검증된 안전 정책 버전: ${checkpoint}\n현재 작업 버전: ${head}\n`);
+  output('보존 대상 다른 서비스 규칙: src/detect.mjs (복구·덮어쓰기 제외)\n');
   const entries = [];
   for (const path of TARGETS) {
     const filename = join(root, path);
