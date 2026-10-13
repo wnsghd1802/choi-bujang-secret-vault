@@ -59,7 +59,7 @@ test('stage10 policy restoration cannot erase an independently approved restore 
  const restored=await readFile(join(f.root,'src/decider.mjs'),'utf8');
  assert.equal(restored,committed,'restoring an older checkpoint must preserve legitimate stage10 restore rule');
  assert.equal(await readFile(join(f.root,'audit-history.txt'),'utf8'),'immutable audit before attack\n');
- assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8',"export const detect=()=>({action:'observe'});\n");
+ assert.equal(await readFile(join(f.root,'src/detect.mjs'),'utf8'),"export const detect=()=>({action:'observe'});\n");
  console.log('POLICY_SCOPE: breach removed; exact approved stage10 route and audit preserved');
 });
 test('unreviewed committed additions cannot be silently reclassified as safe',async t=>{
