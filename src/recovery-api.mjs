@@ -59,7 +59,7 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
     phase = 'judge_b_scope';
     if (actor.kind !== 'judge' || actor.identity !== 'b'
         || !isValidRestoreId(actor.runId)) return fail(403, '시험 계정 B만 복구할 수 있습니다.');
-    const ownerId = noteOwnerId(actor);
+    let ownerId = noteOwnerId(actor);
     if (!ownerId) return fail(403, '소유자를 검증하지 못했습니다.');
 
     phase = 'payload';
@@ -78,10 +78,24 @@ export function createRecoveryHandler({ env = process.env, db: suppliedDb,
       });
       const run = query => query.abortSignal(AbortSignal.timeout(8000));
       phase = 'backup_read';
-      const { data: copy, error: backupError } = await run(db.from('test_note_backups')
+      const loadCopy = forOwner => run(db.from('test_note_backups')
         .select('id,owner_id,run_id,identity,title,content,content_sha256')
-        .eq('id', body.id).eq('owner_id', ownerId).eq('run_id', actor.runId).maybeSingle());
+        .eq('id', body.id).eq('owner_id', forOwner).eq('run_id', actor.runId).maybeSingle());
+      let { data: copy, error: backupError } = await loadCopy(ownerId);
       if (backupError) return fail(503, '비공개 안전 사본을 조회하지 못했습니다.');
+      // Isolated compatibility experiment: a judge may preseed B rows under the
+      // verified JWT sub rather than our derived owner namespace. A fallback is
+      // allowed ONLY for a verified judge-B token and a pre-attack B snapshot
+      // matching the signed run and note ID. Never back up the attacked live row.
+      if (!copy && actor.userId !== ownerId) {
+        phase = 'verified_sub_backup';
+        const legacy = await loadCopy(actor.userId);
+        if (legacy.error) return fail(503, '비공개 안전 사본을 조회하지 못했습니다.');
+        if (legacy.data) {
+          copy = legacy.data;
+          ownerId = actor.userId;
+        }
+      }
       if (!copy) return fail(404, '지정한 시험 메모의 안전 사본이 없습니다.');
       phase = 'backup_integrity';
       if (!verifyPrivateCopy(copy, { id: body.id, ownerId, runId: actor.runId })) {
