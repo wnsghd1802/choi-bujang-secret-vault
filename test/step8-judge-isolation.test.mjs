@@ -29,25 +29,29 @@ test('unknown location source does not deny normal 7th stage fixture', async () 
     await check({ ...normal, signals: { ...normal.signals, source } }, 'allow','approved');
   }
 });
-test('different ID of identical route cannot be assumed to belong to subject', async () => {
+test('individual note routes reach API ownership enforcement', async () => {
   for (const path of ['/notes/other-person','/notes/memo-foreign',
     '/notes/33333333-3333-4333-8333-333333333333']) {
-    await check({ ...normal, path }, 'deny','starter_not_ready');
+    await check({ ...normal, path }, 'allow','approved');
   }
 });
-test('other subject cannot borrow fixture resource allowance', async () =>
-  check({ ...normal, subjectId: 'different_subject' }, 'deny','starter_not_ready'));
-test('unverified item ownership denies even with UUID-shaped ID', async () => {
+test('decider does not make up per-item owners from subject names', async () =>
+  check({ ...normal, subjectId: 'different_subject' }, 'allow','approved'));
+test('individual GET/PUT allow for API ownership check; DELETE and notice writes deny', async () => {
+  const id = '33333333-3333-4333-8333-333333333333';
   for (const [route,method,path] of [
-    ['GET /api/notes/:id','GET','/api/notes/33333333-3333-4333-8333-333333333333'],
-    ['PUT /api/notes/:id','PUT','/api/notes/33333333-3333-4333-8333-333333333333'],
-    ['DELETE /api/notes/:id','DELETE','/api/notes/33333333-3333-4333-8333-333333333333'],
-    ['PUT /api/notices/:id','PUT','/api/notices/33333333-3333-4333-8333-333333333333'],
+    ['GET /api/notes/:id','GET','/api/notes/'+id],
+    ['PUT /api/notes/:id','PUT','/api/notes/'+id],
+  ]) await check({ ...normal, route,method,path }, 'allow','approved');
+  for (const [route,method,path] of [
+    ['DELETE /api/notes/:id','DELETE','/api/notes/'+id],
+    ['PUT /api/notices/:id','PUT','/api/notices/'+id],
   ]) await check({ ...normal, route,method,path }, 'deny','starter_not_ready');
 });
-test('verified-actor-scoped collection read/create delegate to API', async () => {
-  await check({ ...normal, method:'GET',route:'GET /api/notes',path:'/api/notes' }, 'allow','approved');
-  await check({ ...normal, method:'POST',route:'POST /api/notes',path:'/api/notes' }, 'allow','approved');
+test('collection reads and creates are never granted by decider', async () => {
+  await check({ ...normal, method:'GET',route:'GET /notes',path:'/notes' }, 'deny','starter_not_ready');
+  await check({ ...normal, method:'GET',route:'GET /api/notes',path:'/api/notes' }, 'deny','starter_not_ready');
+  await check({ ...normal, method:'POST',route:'POST /api/notes',path:'/api/notes' }, 'deny','starter_not_ready');
 });
 test('query feature selector or nested path never permits zone crossover', async () => {
   await check({ ...normal,method:'GET',route:'GET /api/notes',
