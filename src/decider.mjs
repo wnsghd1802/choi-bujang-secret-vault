@@ -7,7 +7,13 @@ function permittedSingleNote(request) {
     || typeof request.method !== 'string' || typeof request.route !== 'string'
     || typeof request.path !== 'string') return false;
 
-  // No collection reads, exports, notice writes or class/instructor resources.
+  // New stage-10 operation: this exact route reaches the RESTORE handler,
+  // which separately enforces a signed judge-B identity and a single safe note.
+  // No other collection POST, DELETE, aliases, query selectors or exports pass.
+  if (request.method === 'POST' && request.route === 'POST /api/restore'
+      && request.path === '/api/restore') return true;
+
+  // Older per-note ownership policy remains unchanged.
   if (request.method !== 'GET' && request.method !== 'PUT') return false;
   const prefix = request.route === `${request.method} /notes/:id` ? '/notes/'
     : request.route === `${request.method} /api/notes/:id` ? '/api/notes/'
