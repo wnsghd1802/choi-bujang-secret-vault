@@ -11,7 +11,7 @@ DECLARE
   owner_b uuid:=gen_random_uuid();
   owner_a uuid:=gen_random_uuid();
   intruder uuid:=gen_random_uuid();
-  run_id uuid:=gen_random_uuid();
+  v_run uuid:=gen_random_uuid();
   digest text:=encode(sha256(convert_to('verified original','UTF8')),'hex');
   old_audit bigint;
   restored record;
@@ -20,15 +20,15 @@ BEGIN
   INSERT INTO public.notes(id,owner_id,title,content)
     VALUES(a,owner_a,'synthetic A','unchanged A');
   INSERT INTO public.test_recovery_audit(note_id,owner_id,run_id,restored_sha256)
-    VALUES(a,owner_a,run_id,repeat('f',64)) RETURNING event_id INTO old_audit;
+    VALUES(a,owner_a,v_run,repeat('f',64)) RETURNING event_id INTO old_audit;
   PERFORM * FROM public.create_test_note_with_backup(
-    b,owner_b,run_id,'synthetic B','verified original',digest
+    b,owner_b,v_run,'synthetic B','verified original',digest
   );
 
   denied:=false;
   BEGIN
     INSERT INTO public.test_b_mutation_lineage(original_id,current_id,owner_id,run_id)
-      VALUES(b,a,owner_b,run_id);
+      VALUES(b,a,owner_b,v_run);
   EXCEPTION WHEN insufficient_privilege THEN denied:=true;
   END;
   IF NOT denied THEN RAISE EXCEPTION 'S10_FORGED_LINEAGE_INSERT_ALLOWED'; END IF;
@@ -64,7 +64,7 @@ BEGIN
                 WHERE original_id=b AND current_id=moved2)
   THEN RAISE EXCEPTION 'S10_TRUSTED_CHAINED_MOVE_FAILED'; END IF;
   SELECT * INTO restored
-    FROM public.restore_test_note_with_lineage(b,owner_b,run_id,digest);
+    FROM public.restore_test_note_with_lineage(b,owner_b,v_run,digest);
   IF NOT FOUND OR restored.audit_event_id IS NULL
     OR restored.content<>'verified original'
     OR EXISTS(SELECT 1 FROM public.notes WHERE id=moved2)
@@ -73,7 +73,7 @@ BEGIN
         WHERE event_id=old_audit AND note_id=a
           AND restored_sha256=repeat('f',64))<>1
     OR (SELECT count(*) FROM public.test_recovery_audit
-        WHERE note_id=b AND run_id=run_id AND restored_sha256=digest)<>1
+        WHERE note_id=b AND run_id=v_run AND restored_sha256=digest)<>1
   THEN RAISE EXCEPTION 'S10_AUTHORIZATION_OR_AUDIT_REGRESSION'; END IF;
 END $verify$;
 ROLLBACK;
