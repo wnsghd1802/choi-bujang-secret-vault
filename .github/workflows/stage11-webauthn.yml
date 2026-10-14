@@ -1,0 +1,30 @@
+name: Stage11 WebAuthn isolation
+on:
+  push:
+    branches:
+      - main
+      - stage11-webauthn-candidate
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authentication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: WebAuthn credential, signature, origin and replay tests
+        run: node --test test/step11.test.mjs
+      - name: Preserve stage 10 signed restore regression
+        run: npm run test:10
+      - name: Preserve prior-stage policies
+        run: node --test test/stage4.test.mjs
+      - name: Build the public bundle
+        run: npm run build -- --local

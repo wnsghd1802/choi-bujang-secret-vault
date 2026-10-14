@@ -1,69 +1,78 @@
-const encoder = new TextEncoder();
-const hex = bytes => [...new Uint8Array(bytes)].map(x => x.toString(16).padStart(2, '0')).join('');
-const hash = async value => hex(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
-// Only keep the signing key in this page's memory. A stored CryptoKey,
-// even when non-extractable, violates this stage's no-browser-key-storage rule.
-let currentDevice = null;
-let generation = null;
-
-// Remove an IndexedDB database created by the earlier stage-11 build.
-// No secret values are read back, printed, or sent to the server.
-const oldStoreCleanup = new Promise((resolve, reject) => {
-  if (!globalThis.indexedDB) return resolve();
-  const request = indexedDB.deleteDatabase('byteback-device-v11');
-  request.onsuccess = () => resolve();
-  request.onerror = () => reject(new Error('이전 기기 키 저장소를 지우지 못했습니다.'));
-  request.onblocked = () => reject(new Error('이전 기기 키 저장소를 사용하는 다른 탭을 닫고 새로고침해 주세요.'));
-});
-
-async function deviceKey(create = false) {
-  await oldStoreCleanup; // Fail closed if an old persisted key could not be removed.
-  if (!globalThis.crypto?.subtle) throw new Error('HTTPS 보안 연결이 필요합니다.');
-  if (currentDevice || !create) return currentDevice;
-  if (!generation) {
-    generation = (async () => {
-      const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' },
-        false, ['sign', 'verify']);
-      const pub = await crypto.subtle.exportKey('jwk', pair.publicKey);
-      const publicKey = { kty: pub.kty, crv: pub.crv, x: pub.x, y: pub.y };
-      currentDevice = { privateKey: pair.privateKey, publicKey,
-        deviceId: (await hash(publicKey.x + '.' + publicKey.y)).slice(0, 16) };
-      return currentDevice;
-    })().finally(() => { generation = null; });
+// The application never creates or holds a device signing secret.
+// WebAuthn performs signatures in a platform authenticator, not web storage.
+const utf8 = new TextEncoder();
+const base64url = value => {
+  let text = '';
+  for (const byte of new Uint8Array(value)) text += String.fromCharCode(byte);
+  return btoa(text).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
+};
+const bytes = encoded => {
+  if (typeof encoded !== 'string' || !/^[A-Za-z0-9_-]+$/u.test(encoded)) {
+    throw new Error('인증기 응답 형식이 올바르지 않습니다.');
   }
-  return generation;
-}
-async function deviceFetch(path, method, session, body) {
-  const response = await fetch(path, { method, cache: 'no-store',
-    headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+  const text = atob(encoded.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - encoded.length % 4) % 4));
+  return Uint8Array.from(text, char => char.charCodeAt(0));
+};
+const hash = async text => base64url(await crypto.subtle.digest('SHA-256', utf8.encode(text)));
+const hexHash = async text => [...new Uint8Array(await crypto.subtle.digest('SHA-256', utf8.encode(text)))]
+  .map(v => v.toString(16).padStart(2, '0')).join('');
+async function api(session, action, extra = {}) {
+  const response = await fetch('/api/device', {
+    method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify({ action, ...extra }),
   });
-  const result = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(result?.error ?? '기기 요청이 실패했습니다.');
-  return result;
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error ?? '기기 확인을 완료하지 못했습니다.');
+  return data;
+}
+function requireAuthenticator() {
+  if (!globalThis.PublicKeyCredential || !navigator.credentials?.create || !navigator.credentials?.get) {
+    throw new Error('이 기기에서 WebAuthn 보안 인증기를 사용할 수 없습니다.');
+  }
 }
 export async function getDeviceStatus(session) {
-  const key = await deviceKey();
-  if (!key) return 'not_requested';
-  return (await deviceFetch('/api/device?id=' + key.deviceId, 'GET', session)).state;
+  const response = await fetch('/api/device', { method: 'GET', cache: 'no-store',
+    headers: { Authorization: 'Bearer ' + session.access_token } });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error ?? '기기 승인 상태를 조회하지 못했습니다.');
+  return data.state;
 }
 export async function requestDevice(session) {
-  const key = await deviceKey(true);
-  return deviceFetch('/api/device', 'POST', session, {
-    action: 'request', deviceId: key.deviceId, publicKey: key.publicKey,
+  requireAuthenticator();
+  const start = await api(session, 'register-start');
+  const credential = await navigator.credentials.create({ publicKey: {
+    challenge: bytes(start.challenge),
+    rp: { id: start.rpId, name: 'BYTE BACK 안전 자료실' },
+    user: { id: bytes(start.userHandle), name: 'byteback-user', displayName: '자료실 사용자' },
+    pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+    timeout: 60000, attestation: 'none',
+    authenticatorSelection: { userVerification: 'required', residentKey: 'preferred' },
+  } });
+  if (!credential || credential.type !== 'public-key' || !credential.response?.attestationObject) {
+    throw new Error('기기 등록이 취소됐거나 지원되지 않습니다.');
+  }
+  return api(session, 'register-finish', {
+    id: base64url(credential.rawId), challenge: start.challenge,
+    clientDataJSON: base64url(credential.response.clientDataJSON),
+    attestationObject: base64url(credential.response.attestationObject),
   });
 }
 export async function signDeviceRequest(session, method, path, body = '') {
-  const key = await deviceKey();
-  if (!key) throw new Error('기기 승인 요청이 필요합니다.');
-  const at = String(Math.floor(Date.now() / 1000));
-  const nonce = hex(crypto.getRandomValues(new Uint8Array(16)));
-  const message = [method, path, await hash(body), at, nonce,
-    await hash(session.access_token), session.user.id].join('\n');
-  const signature = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' },
-    key.privateKey, encoder.encode(message)));
-  let str = '';
-  for (const byte of signature) str += String.fromCharCode(byte);
-  return { 'X-Device-Id': key.deviceId, 'X-Device-At': at, 'X-Device-Nonce': nonce,
-    'X-Device-Signature': btoa(str).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '') };
+  requireAuthenticator();
+  const start = await api(session, 'assert-start', { method, path, bodyDigest: await hexHash(body) });
+  const credential = await navigator.credentials.get({ publicKey: {
+    challenge: bytes(start.challenge), rpId: start.rpId,
+    allowCredentials: start.credentialIds.map(id => ({
+      type: 'public-key', id: bytes(id),
+    })), userVerification: 'required', timeout: 60000,
+  } });
+  if (!credential || credential.type !== 'public-key' || !credential.response?.signature) {
+    throw new Error('기기 인증이 취소됐습니다.');
+  }
+  const proof = { id: base64url(credential.rawId), challenge: start.challenge,
+    clientDataJSON: base64url(credential.response.clientDataJSON),
+    authenticatorData: base64url(credential.response.authenticatorData),
+    signature: base64url(credential.response.signature) };
+  return { 'X-Device-Proof': base64url(utf8.encode(JSON.stringify(proof))) };
 }
