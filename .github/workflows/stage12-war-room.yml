@@ -1,0 +1,25 @@
+name: Stage12 incident-room regression
+on:
+  push:
+    branches:
+      - stage12-war-room-20261014
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage12:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check src/stage12-workroom.js
+      - run: node --test test/stage12.test.mjs
+      - run: node --test test/step11.test.mjs
+      - run: npm run test:10
+      - run: npm run build -- --local

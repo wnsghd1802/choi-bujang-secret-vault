@@ -29,11 +29,35 @@
     ul { list-style: none; padding: 0; }
     #status { min-height: 1.5em; color: #faf0ac; }
     #account { color: #8ad8df; }
+
+    /* Stage 12: audit panel stays public, but never renders protected note content. */
+    main { max-width: 1120px; }
+    .warroom { border: 1px solid #46617c; border-radius: 16px; padding: clamp(14px, 3vw, 22px); background: #14263a; margin: 28px 0; }
+    .warroom .explain { color: #c4d6ea; }
+    .warroom-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin: 16px 0; }
+    .warroom-metric { background: #0e1d30; border: 1px solid #3b5877; border-radius: 11px; padding: 14px; overflow-wrap: anywhere; }
+    .warroom-metric strong { display: block; margin-top: 6px; color: #e6f5ff; }
+    .warroom-counts { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    .warroom-counts span { padding: 9px 12px; background: #0e1d30; border: 1px solid #3b5877; border-radius: 10px; }
+    .warroom-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 12px 0; }
+    .warroom-tools button { margin-top: 0; }
+    .warroom-tools label { margin: 0; }
+    .warroom-tools select { display: block; margin-top: 4px; padding: 10px; border-radius: 8px; color: #edf5ff; background: #101a28; border: 1px solid #7795b2; }
+    .warroom-file { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; margin: 0; }
+    .warroom-file input { max-width: 240px; width: auto; padding: 5px; font-size: 12px; }
+    .warroom-table { max-width: 100%; overflow-x: auto; border: 1px solid #3b5877; border-radius: 10px; }
+    .warroom-table table { width: 100%; min-width: 960px; border-collapse: collapse; font-size: 12px; }
+    .warroom-table th, .warroom-table td { padding: 9px 10px; border-bottom: 1px solid #2f4560; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+    .warroom-table th { position: sticky; top: 0; color: #a6ecf1; background: #17283a; }
+    .warroom-table tbody tr:nth-child(even) { background: #122238; }
+    .warroom-table td.audit-observed { min-width: 140px; }
+    #warroom-feedback { color: #faf0ac; min-height: 1.5em; }
+    @media(max-width:680px) { .warroom-grid { grid-template-columns: minmax(0,1fr); } }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 11단계 설치형 웹앱 · 기기 승인</div>
+    <div class="eyebrow">BYTE BACK · 12단계 탈환 작전실 · 기기 승인</div>
     <h1>실습 자료실</h1>
     <p>로그인한 뒤 가상 메모를 작성할 수 있습니다. 실제 개인정보는 넣지 마세요.</p>
     <div class="actions"><span id="account">로그인되지 않음</span><button id="logout" hidden>로그아웃</button></div>
@@ -68,6 +92,43 @@
       </form>
       <h2>내 메모</h2><p id="empty" hidden>아직 작성한 메모가 없습니다. 첫 메모를 추가해 보세요.</p>
       <ul id="notes" aria-live="polite"></ul>
+    </section>
+
+    <section id="warroom" class="warroom" aria-labelledby="warroom-heading">
+      <div class="eyebrow">3차 청공 · 12단계 · 탈환 작전실</div>
+      <h2 id="warroom-heading">통합 방어 상황판</h2>
+      <p class="explain">판정 규칙·탐지·접속 회수·복구 버전을 한눈에 확인합니다.
+      여기의 자체 검사와 가상 사건은 실제 심판 판정이나 운영 회수 집행을 대신하지 않습니다.
+      계정 비밀번호·토큰·메모 본문은 기록하지 않습니다.</p>
+      <div class="warroom-grid">
+        <div class="warroom-metric">판정기 규칙<strong id="warroom-policy">불러오는 중</strong><small>출처: 학생 src/decider.mjs</small></div>
+        <div class="warroom-metric">탐지 사건 기준<strong id="warroom-detection">불러오는 중</strong><small>출처: 학생 src/detect.mjs 가상 사건 규약</small></div>
+        <div class="warroom-metric">접속 회수 집행<strong id="warroom-revocation">확인 전</strong><small>실제 상태는 서버 증거로 별도 확인</small></div>
+        <div class="warroom-metric">복구·배포 버전<strong id="warroom-version">확인 전</strong><small>배포 SHA는 복구된 데이터의 증명이 아닙니다</small></div>
+      </div>
+      <h3>1~11단계 정상·거부·운영 점검 41종</h3>
+      <div class="warroom-counts" role="status" aria-live="polite">
+        <span>전체 <strong id="warroom-total">41</strong></span>
+        <span>실제 API 일치 <strong id="warroom-live">0</strong></span>
+        <span>로컬 모의 일치 <strong id="warroom-local">0</strong></span>
+        <span>실행 증거 없음 <strong id="warroom-missing">41</strong></span>
+      </div>
+      <div class="warroom-tools">
+        <button id="warroom-safe-run" type="button">익명 GET 실제 API 검사</button>
+        <button id="warroom-local-run" type="button">판정·탐지 로컬 모의 검사</button>
+        <button id="warroom-export" type="button">실행 기록 JSON 저장</button>
+        <label class="warroom-file">기록 가져오기 <input id="warroom-import" type="file" accept=".json,application/json"></label>
+        <label>단계 <select id="warroom-stage"><option value="all">전체</option><option value="1">1단계</option><option value="2">2단계</option><option value="3">3단계</option><option value="4">4단계</option><option value="5">5단계</option><option value="6">6단계</option><option value="7">7단계</option><option value="8">8단계</option><option value="9">9단계</option><option value="10">10단계</option><option value="11">11단계</option></select></label>
+        <label>결과 <select id="warroom-filter"><option value="all">전체</option><option value="pending">미실행</option><option value="pass">확인 결과 일치</option><option value="fail">불일치/오류</option><option value="imported">가져온 기록</option></select></label>
+      </div>
+      <p id="warroom-feedback" role="status" aria-live="polite">실제 API 검사는 익명 GET 요청만 보냅니다. 변경·복구·관리자 권한 시험은 자동 실행하지 않습니다.</p>
+      <p class="explain">표 표시 <strong id="warroom-visible">41</strong>건. 요청 ID는 브라우저가 발급한 검사 ID이며 서버 상관 ID가 별도 제공되면 구분하여 표시합니다. 가져온 기록은 검증 전 통과로 집계하지 않습니다.</p>
+      <div class="warroom-table" role="region" aria-label="41종 방어 점검 표" tabindex="0">
+        <table>
+          <thead><tr><th>시험 ID</th><th>점검 내용</th><th>방법·경로</th><th>기대 결과</th><th>실제 결과(확인 범위)</th><th>요청 ID</th><th>확인 시각</th><th>출처·상태</th></tr></thead>
+          <tbody id="warroom-rows"><tr><td colspan="8">점검 목록을 불러오는 중입니다.</td></tr></tbody>
+        </table>
+      </div>
     </section>
     <noscript>로그인하려면 브라우저에서 JavaScript를 활성화해 주세요.</noscript>
   </main>
