@@ -12,10 +12,9 @@ try { localStorage.removeItem('sb-fgluruiqasiexuqjvzhq-auth-token'); } catch {}
 
 function saveSession(next) {
   session = next;
-  try {
-    if (next) sessionStorage.setItem(sessionKey, JSON.stringify(next));
-    else sessionStorage.removeItem(sessionKey);
-  } catch { /* In-memory login still works if storage is unavailable. */ }
+  // Never persist access or refresh tokens in browser storage.
+  // Clean up the legacy snapshot without reading its secret contents.
+  try { sessionStorage.removeItem(sessionKey); } catch {}
 }
 
 async function authRequest(body, accessToken) {
@@ -215,8 +214,5 @@ $('note-form').addEventListener('submit', async event => {
   finally { $('save').disabled = false; }
 });
 $('cancel').addEventListener('click', resetEditor);
-try {
-  const saved = JSON.parse(sessionStorage.getItem(sessionKey) ?? 'null');
-  if (saved && typeof saved.access_token === 'string' && typeof saved.refresh_token === 'string'
-      && Number.isSafeInteger(saved.expires_at) && typeof saved.user?.id === 'string') setSession(saved);
-} catch { saveSession(null); }
+// On startup erase earlier versions' stored credentials, never reload them.
+try { sessionStorage.removeItem(sessionKey); } catch {}
