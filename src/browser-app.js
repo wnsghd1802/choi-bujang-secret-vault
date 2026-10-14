@@ -1,3 +1,4 @@
+import { initWarRoom } from './stage12-workroom.js';
 import { getDeviceStatus, requestDevice, signDeviceRequest } from './device-browser.js';
 const $ = id => document.getElementById(id);
 const sessionKey = 'byteback-session-v5';
@@ -216,3 +217,6 @@ $('note-form').addEventListener('submit', async event => {
 $('cancel').addEventListener('click', resetEditor);
 // On startup erase earlier versions' stored credentials, never reload them.
 try { sessionStorage.removeItem(sessionKey); } catch {}
+
+// Stage 12 public, read-only incident room; private notes remain behind device approval.
+initWarRoom();
