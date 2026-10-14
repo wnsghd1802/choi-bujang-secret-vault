@@ -54,6 +54,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f migrations/016-stage10-b-row-lineage.sql
           psql -v ON_ERROR_STOP=1 -f migrations/017-stage10-lineage-write-gate.sql
           psql -v ON_ERROR_STOP=1 -f migrations/018-stage10-direct-seed-prechange.sql
+          psql -v ON_ERROR_STOP=1 -f migrations/019-stage10-full-snapshot-reverification.sql
+          psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-full-snapshot-reverification.sql
           psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-direct-seed-matrix.sql
           psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-lineage-authorization.sql
           psql -v ON_ERROR_STOP=1 -f test/fixtures/stage10-owner-id-matrix.sql
