@@ -1,39 +1,37 @@
 const encoder = new TextEncoder();
 const hex = bytes => [...new Uint8Array(bytes)].map(x => x.toString(16).padStart(2, '0')).join('');
 const hash = async value => hex(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
-function openStore() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('byteback-device-v11', 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('keys');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(new Error('기기 키 저장소를 사용할 수 없습니다.'));
-  });
-}
-async function recordStore(next) {
-  const db = await openStore();
-  try {
-    return await new Promise((resolve, reject) => {
-      const tx = db.transaction('keys', next ? 'readwrite' : 'readonly');
-      const request = next ? tx.objectStore('keys').put(next, 'current')
-        : tx.objectStore('keys').get('current');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(new Error('기기 키를 읽거나 저장하지 못했습니다.'));
-    });
-  } finally { db.close(); }
-}
+// Only keep the signing key in this page's memory. A stored CryptoKey,
+// even when non-extractable, violates this stage's no-browser-key-storage rule.
+let currentDevice = null;
+let generation = null;
+
+// Remove an IndexedDB database created by the earlier stage-11 build.
+// No secret values are read back, printed, or sent to the server.
+const oldStoreCleanup = new Promise((resolve, reject) => {
+  if (!globalThis.indexedDB) return resolve();
+  const request = indexedDB.deleteDatabase('byteback-device-v11');
+  request.onsuccess = () => resolve();
+  request.onerror = () => reject(new Error('이전 기기 키 저장소를 지우지 못했습니다.'));
+  request.onblocked = () => reject(new Error('이전 기기 키 저장소를 사용하는 다른 탭을 닫고 새로고침해 주세요.'));
+});
+
 async function deviceKey(create = false) {
-  if (!crypto?.subtle || !indexedDB) throw new Error('HTTPS와 브라우저 기기 저장소가 필요합니다.');
-  let key = await recordStore();
-  if (!key && create) {
-    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' },
-      false, ['sign', 'verify']);
-    const pub = await crypto.subtle.exportKey('jwk', pair.publicKey);
-    const publicKey = { kty: pub.kty, crv: pub.crv, x: pub.x, y: pub.y };
-    key = { privateKey: pair.privateKey, publicKey,
-      deviceId: (await hash(publicKey.x + '.' + publicKey.y)).slice(0, 16) };
-    await recordStore(key);
+  await oldStoreCleanup; // Fail closed if an old persisted key could not be removed.
+  if (!globalThis.crypto?.subtle) throw new Error('HTTPS 보안 연결이 필요합니다.');
+  if (currentDevice || !create) return currentDevice;
+  if (!generation) {
+    generation = (async () => {
+      const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' },
+        false, ['sign', 'verify']);
+      const pub = await crypto.subtle.exportKey('jwk', pair.publicKey);
+      const publicKey = { kty: pub.kty, crv: pub.crv, x: pub.x, y: pub.y };
+      currentDevice = { privateKey: pair.privateKey, publicKey,
+        deviceId: (await hash(publicKey.x + '.' + publicKey.y)).slice(0, 16) };
+      return currentDevice;
+    })().finally(() => { generation = null; });
   }
-  return key;
+  return generation;
 }
 async function deviceFetch(path, method, session, body) {
   const response = await fetch(path, { method, cache: 'no-store',
