@@ -184,10 +184,13 @@ function validateImported(raw) {
   if (!raw || raw.schema !== 'aleph.stage12.evidence.v1' || !Array.isArray(raw.records)
       || raw.records.length > 41) throw new Error('증거 JSON 버전 또는 기록 수가 올바르지 않습니다.');
   const seen = new Set();
+  const allowedKeys = new Set(['id', 'method', 'path', 'requestId', 'checkedAt',
+    'serverRequestId', 'httpStatus', 'origin', 'result', 'passed', 'observed']);
   const output = [];
   for (const item of raw.records) {
     const info = byId.get(item?.id);
-    if (!info || seen.has(item.id) || !['live-api', 'local-fixture'].includes(item.origin)
+    if (!info || seen.has(item.id) || Object.keys(item).some(key => !allowedKeys.has(key))
+      || !['live-api', 'local-fixture'].includes(item.origin)
       || info.method !== item.method || info.path !== item.path
       || !safeDate(item.checkedAt) || typeof item.requestId !== 'string'
       || !/^[0-9a-f-]{36}$/iu.test(item.requestId) || typeof item.observed !== 'string'
@@ -216,9 +219,12 @@ async function importRecords(event) {
     const parsed = JSON.parse(await file.text());
     const records = validateImported(parsed);
     // Atomic update: do not touch existing evidence when parsing or validation fails.
-    for (const rec of records) recordMap.set(rec.id, rec);
+    for (const rec of records) {
+      const existing = recordMap.get(rec.id);
+      if (!existing || existing.origin === 'imported') recordMap.set(rec.id, rec);
+    }
     render();
-    $('warroom-feedback').textContent = '기록을 가져왔습니다. 외부 기록은 재검증 전까지 통과로 집계하지 않습니다.';
+    $('warroom-feedback').textContent = '기록을 가져왔습니다. 기존의 직접 실행 증거를 덮어쓰지 않으며, 외부 기록은 통과로 집계하지 않습니다.';
   } catch (error) {
     $('warroom-feedback').textContent = '가져오기 실패: ' + error.message + ' · 기존 기록은 유지했습니다.';
   } finally { input.value = ''; }
