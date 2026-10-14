@@ -27,7 +27,7 @@ test('stages 1-2: legacy public data stores expose no notes',async()=>{
 });
 
 test('stages 3-5: deployed identity and route contracts are not overwritten',()=>{
-  assert.equal(config.step,11);
+  assert.equal(config.step,12);
   assert.equal(config.publicAppUrl,'https://choi-bujang-secret-vault-pied.vercel.app');
   assert.equal(config.originalApiUrl,'https://fgluruiqasiexuqjvzhq.supabase.co/rest/v1/notes');
   assert.equal(config.identityProvider.issuer,'https://fgluruiqasiexuqjvzhq.supabase.co/auth/v1');
