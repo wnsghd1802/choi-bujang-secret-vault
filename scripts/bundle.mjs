@@ -36,14 +36,30 @@ try {
     if (error.message?.startsWith('origin 주소가') || error.message?.startsWith('GitHub HTTPS')) throw error;
     fail('GitHub HTTPS 저장소 주소를 origin으로 등록해 주세요.');
   }
-  // Include merge commits by comparing HEAD against its first parent.
+  const config = fromCommit('aleph.config.json');
+  // The stage-12 checkpoint may include follow-up audit fixes. Compare the
+  // final commit to the last first-parent commit from an earlier step, so the
+  // submission lists every stage-12 change (not just a final test fix).
   const parents = git('rev-list', '--parents', '-n', '1', commit).split(/\s+/u);
-  const changeList = parents.length > 1
-    ? git('diff', '--name-only', '--no-renames', parents[1], commit)
+  let comparisonBase = parents.length > 1 ? parents[1] : null;
+  if (config.step === 12 && comparisonBase) {
+    let cursor = commit;
+    for (let depth = 0; depth < 40; depth++) {
+      const lineage = git('rev-list', '--parents', '-n', '1', cursor).split(/\s+/u);
+      if (lineage.length < 2) break;
+      const parent = lineage[1];
+      let previous;
+      try { previous = JSON.parse(git('show', `${parent}:aleph.config.json`)); }
+      catch { break; } // Shallow history: conservatively fall back to first-parent diff.
+      if (previous.step !== 12) { comparisonBase = parent; break; }
+      cursor = parent;
+    }
+  }
+  const changeList = comparisonBase
+    ? git('diff', '--name-only', '--no-renames', comparisonBase, commit)
     : git('diff-tree', '--root', '--no-commit-id', '--name-only', '--no-renames', '-r', commit);
   const changedFiles = changeList.split(/\r?\n/u).filter(Boolean).sort();
-  if (!changedFiles.length) fail('마지막 커밋에 바뀐 파일이 없습니다.');
-  const config = fromCommit('aleph.config.json');
+  if (!changedFiles.length) fail('저장점에서 변경된 파일이 없습니다.');
   if (normalizedRepo(config.repoUrl) !== repoUrl) {
     fail('aleph.config.json의 repoUrl이 Git origin 주소와 다릅니다. 같은 저장소 주소로 맞춰 주세요.');
   }
