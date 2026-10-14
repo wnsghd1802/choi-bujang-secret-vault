@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BYTE BACK | 로그인 자료실</title>
+  <title>BYTE BACK | 승인 기기 자료실</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#101a28">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
     * { box-sizing: border-box; }
@@ -30,7 +33,7 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 5단계 서버로 모으기</div>
+    <div class="eyebrow">BYTE BACK · 11단계 설치형 웹앱 · 기기 승인</div>
     <h1>실습 자료실</h1>
     <p>로그인한 뒤 가상 메모를 작성할 수 있습니다. 실제 개인정보는 넣지 마세요.</p>
     <div class="actions"><span id="account">로그인되지 않음</span><button id="logout" hidden>로그아웃</button></div>
@@ -42,6 +45,19 @@
         <label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password" required>
         <button id="login" type="submit">로그인</button>
       </form>
+    </section>
+    <section class="panel" aria-label="앱 설치 안내">
+      <h2>내 접속 앱 설치</h2>
+      <p>Chrome·Edge에서 '앱 설치', Safari에서는 공유 → 홈 화면에 추가를 사용해 주세요.
+      설치 표시만으로 기기 승인 여부를 판단하지 않습니다. 오프라인에서는 보호 자료를 열거나 수정할 수 없습니다.</p>
+      <button id="install" type="button" hidden>이 기기에 앱 설치</button>
+    </section>
+    <section id="device-panel" class="panel" hidden aria-label="기기 승인">
+      <h2>기기 승인</h2>
+      <p id="device-state" role="status" aria-live="polite">승인 상태 확인 중</p>
+      <p>요청 후 별도의 관리자 확인이 필요합니다. 승인 전에는 보호 자료를 표시하지 않습니다.</p>
+      <div class="actions"><button id="device-request" type="button">이 기기 승인 요청</button>
+      <button id="device-refresh" type="button">승인 결과 새로고침</button></div>
     </section>
     <section id="workspace" hidden aria-label="내 메모">
       <form id="note-form" class="panel">

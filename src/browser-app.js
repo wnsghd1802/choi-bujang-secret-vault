@@ -1,3 +1,4 @@
+import { getDeviceStatus, requestDevice, signDeviceRequest } from './device-browser.js';
 const $ = id => document.getElementById(id);
 const sessionKey = 'byteback-session-v5';
 let session = null;
@@ -55,20 +56,47 @@ function setSession(next) {
   saveSession(next);
   revision++;
   $('login-panel').hidden = !!next;
-  $('workspace').hidden = !next;
+  $('workspace').hidden = true;
+  $('device-panel').hidden = !next;
   $('logout').hidden = !next;
   $('account').textContent = next ? '로그인됨' : '로그인되지 않음';
   if (!next || changedUser) { $('notes').replaceChildren(); resetEditor(); }
-  if (next) void loadNotes();
+  if (next) void updateDeviceAccess();
 }
 
+async function updateDeviceAccess() {
+  const at = revision;
+  $('device-state').textContent = '서버 승인 상태를 확인하고 있습니다.';
+  try {
+    const active = await activeSession();
+    const state = await getDeviceStatus(active);
+    if (at !== revision || !session) return;
+    const approved = state === 'approved';
+    $('device-state').textContent = approved ? '서버 승인 완료 · 기기 서명으로 자료 접근'
+      : state === 'pending' ? '승인 대기 · 자료실 잠김 (관리자 확인 필요)'
+      : state === 'revoked' ? '기기 승인 철회 · 자료실 잠김'
+      : '미등록 기기 · 승인 요청 후 관리자 확인이 필요합니다.';
+    $('workspace').hidden = !approved;
+    if (approved) void loadNotes();
+    else $('notes').replaceChildren();
+  } catch (error) {
+    if (at === revision) {
+      $('workspace').hidden = true;
+      $('device-state').textContent = error.message;
+    }
+  }
+}
 async function api(path, options = {}) {
   let active;
   try { active = await activeSession(); }
   catch (error) { setSession(null); showError(error.message); throw error; }
-  const send = current => fetch(path, { ...options, cache: 'no-store', headers: {
-    'Content-Type': 'application/json', Authorization: `Bearer ${current.access_token}`,
-  } });
+  const send = async current => {
+    const method = options.method ?? 'GET';
+    const proof = await signDeviceRequest(current, method, path, options.body ?? '');
+    return fetch(path, { ...options, cache: 'no-store', headers: {
+      'Content-Type': 'application/json', Authorization: `Bearer ${current.access_token}`, ...proof,
+    } });
+  };
   let response = await send(active);
   if (response.status === 401 && session === active) {
     try { active = await activeSession(true); response = await send(active); }
@@ -154,6 +182,23 @@ $('logout').addEventListener('click', async () => {
   } catch { showError('이 브라우저에서 로그아웃했습니다. 서버 세션 종료는 확인하지 못했습니다.'); }
   finally { $('logout').disabled = false; }
 });
+$('device-request').addEventListener('click', async () => {
+  $('device-request').disabled = true;
+  try { await requestDevice(await activeSession()); await updateDeviceAccess(); }
+  catch (error) { $('device-state').textContent = error.message; }
+  finally { $('device-request').disabled = false; }
+});
+$('device-refresh').addEventListener('click', () => void updateDeviceAccess());
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault(); installPrompt = event; $('install').hidden = false;
+});
+$('install').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  const prompt = installPrompt; installPrompt = null; $('install').hidden = true;
+  await prompt.prompt();
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 $('note-form').addEventListener('submit', async event => {
   event.preventDefault();
   const at = revision;

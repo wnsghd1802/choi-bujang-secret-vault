@@ -5,3 +5,6 @@ bundle-notes.json
 node_modules/
 public/aleph.json
 xdr/alerts.log
+
+# Vercel build output (never commit generated application bundle)
+public/app.js
