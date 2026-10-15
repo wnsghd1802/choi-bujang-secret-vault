@@ -51,6 +51,12 @@ async function runStageThreeChecks(config) {
     ...(config.step >= 10 ? [['anonymous_restore', '/api/restore', 'POST', null]] : []),
     ['malformed_login_token', '/api/notes', 'GET', 'invalid.token.value'],
   ]) {
+    // The isolated bundle runner permits GET/HEAD only; do not send write requests.
+    if (method !== 'GET') {
+      results.push({ attackId, expected: '인증 없는 요청은 JSON 오류와 401 또는 403',
+        observed: 'not_run' });
+      continue;
+    }
     // Invalid empty write requests cannot create a record even if authorization fails open.
     const response = await get(path, { method, headers: { 'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}) },
