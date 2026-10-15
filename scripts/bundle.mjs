@@ -6,10 +6,21 @@ import { RULE_IDS } from '../src/decider.mjs';
 import { runAttackChecks } from '../src/stage12-attack-check.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const git = (...args) => execFileSync('git', args, {
+const gitOptions = {
   cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 512 * 1024,
-}).trim();
-const fromCommit = (path) => JSON.parse(git('show', `HEAD:${path}`));
+};
+// The isolated runner can verify that every subprocess invokes a read-only Git command.
+const gitStatus = () => execFileSync('git',
+  ['status', '--porcelain', '--untracked-files=all'], gitOptions).trim();
+const gitHead = () => execFileSync('git', ['rev-parse', '--verify', 'HEAD'], gitOptions).trim();
+const gitShow = (revisionPath) => execFileSync('git', ['show', revisionPath], gitOptions).trim();
+const gitParents = (revision) => execFileSync('git',
+  ['rev-list', '--parents', '-n', '1', revision], gitOptions).trim();
+const gitChanged = (base, revision) => execFileSync('git',
+  ['diff', '--name-only', '--no-renames', base, revision], gitOptions).trim();
+const gitRootChanged = (revision) => execFileSync('git',
+  ['diff-tree', '--root', '--no-commit-id', '--name-only', '--no-renames', '-r', revision], gitOptions).trim();
+const fromCommit = (path) => JSON.parse(gitShow(`HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
 const secretPattern = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\bsb_secret_[A-Za-z0-9_-]{12,}|\bsk-[A-Za-z0-9_-]{20,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
 const repository = /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})\/?$/iu;
@@ -24,9 +35,9 @@ const normalizedRepo = value => {
 };
 
 try {
-  const dirty = git('status', '--porcelain', '--untracked-files=all');
+  const dirty = gitStatus();
   if (dirty) fail(`커밋되지 않은 파일이 있습니다. 먼저 확인해 주세요:\n${dirty}`);
-  const commit = git('rev-parse', '--verify', 'HEAD');
+  const commit = gitHead();
   // Identity comes from the committed configuration; isolated runners may
   // disallow even read-only git config and git remote subcommands.
   const config = fromCommit('aleph.config.json');
@@ -34,24 +45,24 @@ try {
   // The stage-12 checkpoint may include follow-up audit fixes. Compare the
   // final commit to the last first-parent commit from an earlier step, so the
   // submission lists every stage-12 change (not just a final test fix).
-  const parents = git('rev-list', '--parents', '-n', '1', commit).split(/\s+/u);
+  const parents = gitParents(commit).split(/\s+/u);
   let comparisonBase = parents.length > 1 ? parents[1] : null;
   if (config.step === 12 && comparisonBase) {
     let cursor = commit;
     for (let depth = 0; depth < 40; depth++) {
-      const lineage = git('rev-list', '--parents', '-n', '1', cursor).split(/\s+/u);
+      const lineage = gitParents(cursor).split(/\s+/u);
       if (lineage.length < 2) break;
       const parent = lineage[1];
       let previous;
-      try { previous = JSON.parse(git('show', `${parent}:aleph.config.json`)); }
+      try { previous = JSON.parse(gitShow(`${parent}:aleph.config.json`)); }
       catch { break; } // Shallow history: conservatively fall back to first-parent diff.
       if (previous.step !== 12) { comparisonBase = parent; break; }
       cursor = parent;
     }
   }
   const changeList = comparisonBase
-    ? git('diff', '--name-only', '--no-renames', comparisonBase, commit)
-    : git('diff-tree', '--root', '--no-commit-id', '--name-only', '--no-renames', '-r', commit);
+    ? gitChanged(comparisonBase, commit)
+    : gitRootChanged(commit);
   const changedFiles = changeList.split(/\r?\n/u).filter(Boolean).sort();
   if (!changedFiles.length) fail('저장점에서 변경된 파일이 없습니다.');
 
