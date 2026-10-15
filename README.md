@@ -37,6 +37,32 @@
 - `npm run bundle`을 실행해 `artifacts/submission.json`의 `step=12`, `commit`, `changedFiles`, `policyRules` 및 `attackAttempts`를 확인합니다. 이 점검은 실제 배포 API 호출을 포함하므로 배포 반영 전에 성공이라고 할 수 없습니다.
 - `bundle-notes.json`과 `artifacts/submission.json`은 커밋하지 않습니다. 실제 심판 점수 및 41종 전체 실서비스 통과는 **미확인**입니다.
 
+
+## 12단계 현재 검증 상태와 운영 중지 (2026-10-15)
+
+- 현재 저장소의 마지막 커밋은 `git log -1 --oneline`으로 확인합니다. README의 10월 14일 기록은 최초 12단계 저장점의 설명이며 이후 GitHub 커밋·배포·제출 묶음 점검이 계속됐습니다. 배포된 현재 버전은 `/aleph.json`의 `commit`과 대조합니다.
+- 작전실은 41종 **점검 계획**을 표시합니다. 익명 GET 및 로컬 판정·탐지 모의만 실행 가능한 범위에서 기록하고, 승인된 가상 A/B의 정상 조회·교차 소유자 조회 거부·운영 회수·실제 복구는 실측 증거 없이는 **미실행**으로 둡니다. 서버에 실제 확인된 요청 ID·시간·응답 상태를 남기지 않은 검사는 통과로 계산하지 않습니다.
+- `npm run bundle`은 `scripts/bundle.mjs`에서 Git 읽기(`status`, `rev-parse`, `show`, `diff`)와 허용된 파일 작업만 수행하고, `src/stage12-attack-check.mjs`에서 공개 HTTPS로 무인증 GET 2건만 전송하도록 구성했습니다. 쓰기·복구 검사 및 실행하지 않은 나머지 제출 점검은 `observed: 'not_run'`으로 기록합니다. 현재까지의 GitHub Actions 성공은 **ALEPH 격리 심판 성공을 의미하지 않습니다.**
+- **최신 심판 확인 결과:** `S12_BUNDLE_UNSUPPORTED` (0/100). 심판은 격리 실행 중 허용되지 않은 명령을 지적했으나, 현재 공개된 오류 메시지에는 차단된 구체적인 호출과 실행 스택이 없습니다. 원인·해결 여부는 미확인으로 남기며 판정 전에 임의로 성공 처리하지 않습니다.
+
+### 현재 버전 설치·검사·중지·복구 재현
+
+```sh
+git status --short
+git log -1 --oneline
+npm ci
+npm run test:12
+npm run test:10
+node --test test/step11.test.mjs
+npm run build -- --local
+# Vercel 배포된 /aleph.json 커밋 확인 후:
+npm run bundle
+```
+
+- **실행·중지:** 위 빌드·검사·bundle 명령은 종료되는 일회성 작업이며 상주 서버를 띄우지 않습니다. 로컬 미리보기 서버를 별도로 실행했다면 해당 터미널에서 `Ctrl+C`로 종료합니다. 운영 Vercel 배포는 로컬 프로세스와 별도이며, 운영 중지는 프로젝트 관리자 승인 후 Vercel에서 처리해야 합니다. 데이터를 삭제해 중지하지 않습니다.
+- **복구:** 먼저 `git status`·`git diff`와 검증된 이전 커밋의 변경 내용을 비교합니다. 문제가 된 파일만 검증된 버전으로 복원하고 전체 저장소 초기화(`git reset --hard`)는 사용하지 않습니다. DB 복원은 기존 침해 전 사본과 감사 기록을 별도 검증한 경우에만 승인된 범위에서 진행합니다. 자세한 절차는 `docs/STAGE12_RUNBOOK.md`를 따릅니다.
+- **출처:** `src/decider.mjs`·`src/detect.mjs`·`src/stage12-workroom.js`는 학생 구현이며, 신원·기기·경로 계약 및 실제 엔진 집행은 **ALEPH SDP 제공 엔진**의 영역입니다. 테스트 성공을 제공 엔진 운영 집행으로 간주하지 않습니다.
+
 ---
 
 ## 11단계 — WebAuthn 인증기 서명 및 서버 기기 승인 (2026-10-14)
