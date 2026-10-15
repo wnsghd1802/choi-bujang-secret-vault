@@ -4,6 +4,7 @@ import { STAGE12_CASES, STAGE12_PROBES, checkedResult } from '../src/stage12-cas
 import { deploymentIdentity } from '../scripts/deployment-identity.mjs';
 import { decide, RULE_IDS } from '../src/decider.mjs';
 import { detect } from '../src/detect.mjs';
+import { fixtureRequest } from '../src/stage12-workroom.js';
 import config from '../aleph.config.json' with { type: 'json' };
 
 test('stage 12 has exactly 41 different scenarios across stages 1-11', () => {
@@ -80,4 +81,21 @@ test('stage 9 detector only proposes revocation in a local test, not execution',
   assert.deepEqual(detect(e(121)), {
     action: 'propose_revocation', reasonCode: 'burst_read', subject: 'fixture',
   });
+});
+
+test('stage 12 workroom selects each fixture by case ID while preserving request ID', async () => {
+  const requestId = '123e4567-e89b-42d3-a456-426614174000';
+  const cases = [
+    ['S06-01', 'allow'], ['S06-02', 'deny'], ['S06-03', 'deny'],
+    ['S07-01', 'allow'], ['S07-02', 'step_up'], ['S07-03', 'allow'],
+    ['S08-01', 'allow'], ['S08-02', 'deny'], ['S08-04', 'deny'],
+  ];
+  for (const [caseId, expected] of cases) {
+    const request = fixtureRequest(caseId, requestId);
+    assert.equal(request.requestId, requestId, caseId);
+    const response = await decide(request);
+    assert.equal(response.requestId, requestId, caseId);
+    assert.equal(response.decision, expected, caseId);
+    assert.ok(response.ruleIds.every(rule => RULE_IDS.includes(rule)), caseId);
+  }
 });

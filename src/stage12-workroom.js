@@ -102,9 +102,9 @@ async function runSafeProbes() {
     $('warroom-feedback').textContent = '익명 GET만 확인했습니다. 인증·권한·복구·운영 회수 항목은 별도 확인이 필요합니다.';
   } finally { button.disabled = false; }
 }
-function fixtureRequest(id) {
+export function fixtureRequest(caseId, requestId) {
   const req = {
-    schema: 'aleph.decision.v1', requestId: id, classId: 'class_fixture',
+    schema: 'aleph.decision.v1', requestId, classId: 'class_fixture',
     projectId: 'project_fixture', subjectId: 'subject_fixture',
     deviceId: 'aaaaaaaaaaaaaaaa', service: 'notes',
     method: 'GET', route: 'GET /notes/:id', path: '/notes/demo', queryLength: 0,
@@ -113,15 +113,15 @@ function fixtureRequest(id) {
     signals: { source: 'judge_fixture', region: 'local', network: 'usual', hour: 14 },
     recentEvents: [],
   };
-  if (id === 'S06-02') req.deviceRegistered = false;
-  if (id === 'S06-03') req.deviceRegistered = 'true';
-  if (id === 'S07-02' || id === 'S07-03') {
+  if (caseId === 'S06-02') req.deviceRegistered = false;
+  if (caseId === 'S06-03') req.deviceRegistered = 'true';
+  if (caseId === 'S07-02' || caseId === 'S07-03') {
     req.signals = { source: 'judge_fixture', region: 'foreign', network: 'unusual', hour: 3 };
     req.recentEvents = [{ kind: 'risk_signal', ageSeconds: 60, count: 20 }];
   }
-  if (id === 'S07-03') req.stepUp = { verified: true, authAgeSeconds: 60 };
-  if (id === 'S08-02') req.queryLength = 1;
-  if (id === 'S08-04') { req.route = 'GET /api/notes'; req.path = '/api/notes'; }
+  if (caseId === 'S07-03') req.stepUp = { verified: true, authAgeSeconds: 60 };
+  if (caseId === 'S08-02') req.queryLength = 1;
+  if (caseId === 'S08-04') { req.route = 'GET /api/notes'; req.path = '/api/notes'; }
   return req;
 }
 const expectedDecisions = {
@@ -144,7 +144,7 @@ async function runLocalFixtures() {
       const rec = makeRecord(item, { origin: 'local-fixture' });
       try {
         if (item.id in expectedDecisions) {
-          const result = await decide(fixtureRequest(rec.requestId));
+          const result = await decide(fixtureRequest(item.id, rec.requestId));
           rec.passed = result.schema === 'aleph.decision.v1' && result.requestId === rec.requestId
             && result.decision === expectedDecisions[item.id]
             && Array.isArray(result.ruleIds) && result.ruleIds.length > 0
