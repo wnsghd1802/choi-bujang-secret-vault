@@ -14,12 +14,8 @@ const gitStatus = () => execFileSync('git',
   ['status', '--porcelain', '--untracked-files=all'], gitOptions).trim();
 const gitHead = () => execFileSync('git', ['rev-parse', '--verify', 'HEAD'], gitOptions).trim();
 const gitShow = (revisionPath) => execFileSync('git', ['show', revisionPath], gitOptions).trim();
-const gitParents = (revision) => execFileSync('git',
-  ['rev-list', '--parents', '-n', '1', revision], gitOptions).trim();
 const gitChanged = (base, revision) => execFileSync('git',
   ['diff', '--name-only', '--no-renames', base, revision], gitOptions).trim();
-const gitRootChanged = (revision) => execFileSync('git',
-  ['diff-tree', '--root', '--no-commit-id', '--name-only', '--no-renames', '-r', revision], gitOptions).trim();
 const fromCommit = (path) => JSON.parse(gitShow(`HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
 const secretPattern = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\bsb_secret_[A-Za-z0-9_-]{12,}|\bsk-[A-Za-z0-9_-]{20,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
@@ -42,27 +38,11 @@ try {
   // disallow even read-only git config and git remote subcommands.
   const config = fromCommit('aleph.config.json');
   const repoUrl = normalizedRepo(config.repoUrl);
-  // The stage-12 checkpoint may include follow-up audit fixes. Compare the
-  // final commit to the last first-parent commit from an earlier step, so the
-  // submission lists every stage-12 change (not just a final test fix).
-  const parents = gitParents(commit).split(/\s+/u);
-  let comparisonBase = parents.length > 1 ? parents[1] : null;
-  if (config.step === 12 && comparisonBase) {
-    let cursor = commit;
-    for (let depth = 0; depth < 40; depth++) {
-      const lineage = gitParents(cursor).split(/\s+/u);
-      if (lineage.length < 2) break;
-      const parent = lineage[1];
-      let previous;
-      try { previous = JSON.parse(gitShow(`${parent}:aleph.config.json`)); }
-      catch { break; } // Shallow history: conservatively fall back to first-parent diff.
-      if (previous.step !== 12) { comparisonBase = parent; break; }
-      cursor = parent;
-    }
-  }
-  const changeList = comparisonBase
-    ? gitChanged(comparisonBase, commit)
-    : gitRootChanged(commit);
+  // Stage 12 starts after this verified step-11 checkpoint. Avoid Git history
+  // subprocess loops in the restricted bundle runner while retaining all
+  // changes made throughout stage 12 in the submission.
+  const comparisonBase = config.step === 12 ? 'fd087248b89674aadc256d677972301e8b92f5cf' : `${commit}^`;
+  const changeList = gitChanged(comparisonBase, commit);
   const changedFiles = changeList.split(/\r?\n/u).filter(Boolean).sort();
   if (!changedFiles.length) fail('저장점에서 변경된 파일이 없습니다.');
 
