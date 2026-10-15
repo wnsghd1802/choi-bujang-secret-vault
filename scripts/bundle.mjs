@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { RULE_IDS } from '../src/decider.mjs';
-import { runAttackChecks } from '../src/attack-check.mjs';
+import { runAttackChecks } from '../src/stage12-attack-check.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const git = (...args) => execFileSync('git', args, {
