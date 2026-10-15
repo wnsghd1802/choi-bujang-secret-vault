@@ -16,6 +16,7 @@ const gitHead = () => execFileSync('git', ['rev-parse', '--verify', 'HEAD'], git
 const gitShow = (revisionPath) => execFileSync('git', ['show', revisionPath], gitOptions).trim();
 const gitChanged = (base, revision) => execFileSync('git',
   ['diff', '--name-only', '--no-renames', base, revision], gitOptions).trim();
+const gitTree = (revision) => execFileSync('git', ['ls-tree', '-r', '-z', revision], gitOptions);
 const fromCommit = (path) => JSON.parse(gitShow(`HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
 const secretPattern = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\bsb_secret_[A-Za-z0-9_-]{12,}|\bsk-[A-Za-z0-9_-]{20,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
@@ -38,12 +39,28 @@ try {
   // disallow even read-only git config and git remote subcommands.
   const config = fromCommit('aleph.config.json');
   const repoUrl = normalizedRepo(config.repoUrl);
-  // Stage 12 starts after this verified step-11 checkpoint. Avoid Git history
-  // subprocess loops in the restricted bundle runner while retaining all
-  // changes made throughout stage 12 in the submission.
-  const comparisonBase = config.step === 12 ? 'fd087248b89674aadc256d677972301e8b92f5cf' : `${commit}^`;
-  const changeList = gitChanged(comparisonBase, commit);
-  const changedFiles = changeList.split(/\r?\n/u).filter(Boolean).sort();
+  // The grader may check out only HEAD, without the older Stage 11 commit object.
+  // Compare Git blob IDs and modes against the verified Stage 11 tree snapshot.
+  // This works with a shallow checkout and does not execute fetch or write to Git.
+  let changedFiles;
+  if (config.step === 12) {
+    const snapshot = JSON.parse(readFileSync(join(root, 'scripts', 'stage12-baseline.json'), 'utf8'));
+    if (snapshot.commit !== 'fd087248b89674aadc256d677972301e8b92f5cf'
+        || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
+      fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
+    }
+    const currentFiles = new Map();
+    for (const entry of gitTree(commit).split('\0')) {
+      if (!entry) continue;
+      const match = entry.match(/^(\d{6}) blob ([0-9a-f]{40})\t(.+)$/u);
+      if (!match) fail('HEAD의 Git 파일 목록을 해석할 수 없습니다.');
+      currentFiles.set(match[3], `${match[1]}:${match[2]}`);
+    }
+    changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
+      .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
+  } else {
+    changedFiles = gitChanged(`${commit}^`, commit).split(/\r?\n/u).filter(Boolean).sort();
+  }
   if (!changedFiles.length) fail('저장점에서 변경된 파일이 없습니다.');
 
   let notes;
