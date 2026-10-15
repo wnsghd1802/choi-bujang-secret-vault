@@ -45,7 +45,7 @@ if (isBundle || process.env.STAGE12_POLICY_SELF_TEST === '1') {
     const [verb, ...rest] = args;
     if (verb === 'status') return rest.join(' ') === '--porcelain --untracked-files=all';
     // The script only resolves tree/blob identifiers; it never writes Git objects.
-    const objectSpec = /^(?:HEAD|[0-9a-f]{40}):[A-Za-z0-9._/-]*$/u;
+    const objectSpec = /^(?:HEAD|[0-9a-f]{40}):[A-Za-z0-9._/\[\]-]*$/u;
     if (verb === 'rev-parse') return rest.join(' ') === '--verify HEAD' ||
       (rest.length > 0 && rest.every(r => objectSpec.test(r)));
     if (verb === 'show') return rest.length === 1 && objectSpec.test(rest[0]);
