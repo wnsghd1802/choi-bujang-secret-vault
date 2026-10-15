@@ -1,0 +1,31 @@
+name: Stage12 isolated checkout diagnostic
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare-checkouts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        depth: [1, 0]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ matrix.depth }}
+      - name: Use Node 22 (no package install)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Show test environment
+        run: |
+          echo "checkout depth ${{ matrix.depth }}"
+          git log -1 --format='%h %s'
+          test ! -d node_modules && echo 'No node_modules present'
+      - name: Run exact bundle with no package installation or local notes
+        run: npm run bundle
