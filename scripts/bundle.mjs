@@ -7,8 +7,6 @@ import { runAttackChecks } from '../src/stage12-attack-check.mjs';
 const root = resolve(import.meta.dirname, '..');
 const git = (...args) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 512 * 1024,
-  windowsHide: true,
-  env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' },
 }).trim();
 const fromCommit = (path) => JSON.parse(git('show', `HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
