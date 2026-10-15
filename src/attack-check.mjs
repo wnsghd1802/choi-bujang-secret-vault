@@ -36,7 +36,8 @@ async function runStageThreeChecks(config) {
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash
       || app.pathname !== '/' || app.hostname.endsWith('.example')) throw new Error('실제 HTTPS 배포 주소를 확인해 주세요.');
-  const get = (path, options = {}) => fetch(new URL(path, app), { ...options,
+  const get = (path, headers) => fetch(new URL(path, app), {
+    method: 'GET', ...(headers ? { headers } : {}),
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
   const results = [];
@@ -57,11 +58,8 @@ async function runStageThreeChecks(config) {
         observed: 'not_run' });
       continue;
     }
-    // Invalid empty write requests cannot create a record even if authorization fails open.
-    const response = await get(path, { method, headers: { 'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      ...(['POST', 'PUT'].includes(method) ? { body: '{}' } : {}),
-    });
+    // All requests actually dispatched by this loop use the public HTTPS GET path.
+    const response = await get(path, token ? { Authorization: `Bearer ${token}` } : undefined);
     const payload = await response.json().catch(() => null);
     const denied = [401, 403].includes(response.status) && typeof payload?.error === 'string';
     results.push({ attackId, expected: '인증 없는 요청은 JSON 오류와 401 또는 403',
@@ -88,7 +86,10 @@ async function runStageThreeChecks(config) {
     results.push({ attackId: 'allowed_routes', expected: '배포 메타데이터에 허용 경로 기록',
       observed: Array.isArray(identity?.allowedRoutes) && identity.allowedRoutes.length > 0 ? '허용 경로 기록 확인' : '허용 경로 누락' });
     // This optional public key is for direct-origin checks only; never include its value in reports.
-    if (process.env.SUPABASE_PUBLISHABLE_KEY) {
+    if (config.step === 12) {
+      results.push({ attackId: 'direct_origin_read', expected: '공개 키로 원본 자료 읽기 거부',
+        observed: 'not_run' });
+    } else if (process.env.SUPABASE_PUBLISHABLE_KEY) {
       const origin = new URL(config.originalApiUrl);
       const issuer = new URL(config.identityProvider.issuer);
       if (origin.origin !== issuer.origin || origin.pathname !== '/rest/v1/notes' || origin.search || origin.hash) throw new Error('원본 자료 주소를 확인해 주세요.');
