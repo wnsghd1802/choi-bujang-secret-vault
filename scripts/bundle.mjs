@@ -16,7 +16,34 @@ const gitHead = () => execFileSync('git', ['rev-parse', '--verify', 'HEAD'], git
 const gitShow = (revisionPath) => execFileSync('git', ['show', revisionPath], gitOptions).trim();
 const gitChanged = (base, revision) => execFileSync('git',
   ['diff', '--name-only', '--no-renames', base, revision], gitOptions).trim();
-const gitTree = (revision) => execFileSync('git', ['ls-tree', '-r', '-z', revision], gitOptions);
+// Enumerate tracked files with Git show (tree listings) and read their blob IDs
+// with Git rev-parse. Neither command modifies the repository.
+const gitTreeFiles = (revision) => {
+  const paths = [];
+  const visit = (folder) => {
+    const listing = gitShow(`${revision}:${folder}`).split(/\r?\n/u);
+    if (listing[0] !== `tree ${revision}:${folder}` || listing[1] !== '') {
+      fail('Git show의 파일 목록을 읽을 수 없습니다.');
+    }
+    for (const item of listing.slice(2)) {
+      if (!item) continue;
+      if (item.startsWith('"') || item.includes('\\')) fail('인용된 Git 경로를 확인해 주세요.');
+      const directory = item.endsWith('/');
+      const filename = folder ? `${folder}/${directory ? item.slice(0, -1) : item}`
+        : directory ? item.slice(0, -1) : item;
+      if (directory) visit(filename);
+      else paths.push(filename);
+    }
+  };
+  visit('');
+  if (!paths.length) fail('HEAD의 Git 파일 목록이 비어 있습니다.');
+  const ids = execFileSync('git', ['rev-parse', ...paths.map(path => `${revision}:${path}`)],
+    gitOptions).trim().split(/\r?\n/u);
+  if (ids.length !== paths.length || ids.some(id => !/^[0-9a-f]{40}$/u.test(id))) {
+    fail('Git 파일 객체 ID를 확인할 수 없습니다.');
+  }
+  return new Map(paths.map((path, i) => [path, `100644:${ids[i]}`]));
+};
 const fromCommit = (path) => JSON.parse(gitShow(`HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
 const secretPattern = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\bsb_secret_[A-Za-z0-9_-]{12,}|\bsk-[A-Za-z0-9_-]{20,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
@@ -49,13 +76,7 @@ try {
         || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
       fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
     }
-    const currentFiles = new Map();
-    for (const entry of gitTree(commit).split('\0')) {
-      if (!entry) continue;
-      const match = entry.match(/^(\d{6}) blob ([0-9a-f]{40})\t(.+)$/u);
-      if (!match) fail('HEAD의 Git 파일 목록을 해석할 수 없습니다.');
-      currentFiles.set(match[3], `${match[1]}:${match[2]}`);
-    }
+    const currentFiles = gitTreeFiles(commit);
     changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
       .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
   } else {
