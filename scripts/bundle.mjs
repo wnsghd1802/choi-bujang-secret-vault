@@ -52,22 +52,39 @@ const checkoutHead = () => {
   }
   return sha;
 };
-// Query the Git index through Git's read-only tracked-file interface.
-// --stage supplies the blob ID and mode; -z preserves exact file names.
-// This works on shallow checkouts without parsing .git/index ourselves.
-const trackedGitFiles = () => {
-  const listing = execFileSync('git', ['ls-files', '--stage', '-z'], {
-    cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 2 * 1024 * 1024,
-  });
-  const files = new Map();
-  for (const entry of listing.split('\0')) {
-    if (!entry) continue;
-    const match = entry.match(/^(\d{6}) ([0-9a-f]{40}) ([0-3])\t([\s\S]+)$/u);
-    if (!match || match[3] !== '0' || !['100644', '100755', '120000', '160000'].includes(match[1])
-        || files.has(match[4])) fail('Git 추적 파일 목록을 확인할 수 없습니다.');
-    files.set(match[4], `${match[1]}:${match[2]}`);
+// Use only read-only git show; do not parse .git/index or invoke ls-files/ls-tree.
+// In shallow (depth-1) checkouts, HEAD is a root commit and --root yields every
+// tracked blob. In full checkouts, replay post-baseline changes newest-first.
+const trackedGitFiles = (baseline, revision) => {
+  const gitRaw = spec => execFileSync('git',
+    ['show', '--raw', '--no-renames', '--abbrev=40', '--format=', '--root', spec],
+    { cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 2 * 1024 * 1024 });
+  const parse = output => {
+    const entries = [];
+    for (const line of output.split(/\r?\n/u)) {
+      if (!line) continue;
+      const match = line.match(/^:([0-7]{6}) ([0-7]{6}) ([0-9a-f]{40}) ([0-9a-f]{40}) ([AMDT])\t(.+)$/u);
+      if (!match) fail('Git show 변경 파일 목록을 해석할 수 없습니다.');
+      entries.push({ oldMode: match[1], mode: match[2], oid: match[4], path: match[6] });
+    }
+    return entries;
+  };
+  const headEntries = parse(gitRaw(revision));
+  const rootSnapshot = headEntries.length >= Object.keys(baseline.files).length / 2
+    && headEntries.every(row => row.oldMode === '000000');
+  // A shallow single-commit checkout yields a full tracked snapshot here.
+  const entries = rootSnapshot ? headEntries : parse(gitRaw(`${baseline.commit}..${revision}`));
+  const files = new Map(rootSnapshot ? [] : Object.entries(baseline.files));
+  const seen = new Set();
+  for (const row of entries) {
+    if (seen.has(row.path)) continue; // newest commit wins
+    seen.add(row.path);
+    if (row.mode === '000000') files.delete(row.path);
+    else if (['100644', '100755', '120000', '160000'].includes(row.mode))
+      files.set(row.path, `${row.mode}:${row.oid}`);
+    else fail('Git 파일 권한 모드를 확인할 수 없습니다.');
   }
-  if (!files.size) fail('Git 추적 파일이 없습니다.');
+  if (!files.size) fail('HEAD의 추적 파일 목록이 비어 있습니다.');
   return files;
 };
 const fail = (message) => { throw new Error(message); };
@@ -113,7 +130,7 @@ try {
         || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
       fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
     }
-    const currentFiles = trackedGitFiles();
+    const currentFiles = trackedGitFiles(snapshot, commit);
     changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
       .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
   } else {

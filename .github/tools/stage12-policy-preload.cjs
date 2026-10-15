@@ -46,7 +46,12 @@ if (isBundle || process.env.STAGE12_POLICY_SELF_TEST === '1') {
     if (verb === 'status') return rest.join(' ') === '--porcelain --untracked-files=all';
     // Stage 12 only needs the HEAD commit and its committed config.
     if (verb === 'rev-parse') return rest.join(' ') === '--verify HEAD';
-    if (verb === 'show') return rest.length === 1 && rest[0] === 'HEAD:aleph.config.json';
+    if (verb === 'show') {
+      if (rest.length === 1 && rest[0] === 'HEAD:aleph.config.json') return true;
+      const rawArgs = ['--raw', '--no-renames', '--abbrev=40', '--format=', '--root'];
+      return rest.length === 6 && rawArgs.every((x, i) => rest[i] === x)
+        && /^(?:[0-9a-f]{40}|[0-9a-f]{40}\.\.[0-9a-f]{40})$/u.test(rest[5]);
+    }
     if (verb === 'diff') return rest.length === 4 && rest[0] === '--name-only' &&
       rest[1] === '--no-renames' && rest.slice(2).every(r => /^[0-9a-f]{40}$/u.test(r));
     return false;
