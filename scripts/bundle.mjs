@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RULE_IDS } from '../src/decider.mjs';
@@ -9,7 +9,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // the checked-out repository without spawning any command for Stage 12.
 const gitDirectory = () => {
   const marker = join(root, '.git');
-  if (statSync(marker).isDirectory()) return marker;
+  // A regular checkout has .git/HEAD; a worktree uses a .git pointer file.
+  // Only the already-allowed readFileSync is used in the isolated bundle.
+  try {
+    readFileSync(join(marker, 'HEAD'), 'utf8');
+    return marker;
+  } catch (error) {
+    if (error.code !== 'ENOTDIR' && error.code !== 'ENOENT') throw error;
+  }
   const match = readFileSync(marker, 'utf8').trim().match(/^gitdir: (.+)$/u);
   if (!match) throw new Error('Git 작업 디렉터리를 확인할 수 없습니다.');
   return resolve(root, match[1]);
