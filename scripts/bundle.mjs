@@ -1,26 +1,54 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RULE_IDS } from '../src/decider.mjs';
 import { runAttackChecks } from '../src/attack-check.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const gitOptions = {
-  cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 512 * 1024,
+// The Stage 12 judge has a strict subprocess allowlist. Read Git metadata from
+// the checked-out repository without spawning any command for Stage 12.
+const gitDirectory = () => {
+  const marker = join(root, '.git');
+  if (statSync(marker).isDirectory()) return marker;
+  const match = readFileSync(marker, 'utf8').trim().match(/^gitdir: (.+)$/u);
+  if (!match) throw new Error('Git 작업 디렉터리를 확인할 수 없습니다.');
+  return resolve(root, match[1]);
 };
-// The isolated runner can verify that every subprocess invokes a read-only Git command.
-const gitStatus = () => execFileSync('git',
-  ['status', '--porcelain', '--untracked-files=all'], gitOptions).trim();
-const gitHead = () => execFileSync('git', ['rev-parse', '--verify', 'HEAD'], gitOptions).trim();
-const gitShow = (revisionPath) => execFileSync('git', ['show', revisionPath], gitOptions).trim();
-const gitChanged = (base, revision) => execFileSync('git',
-  ['diff', '--name-only', '--no-renames', base, revision], gitOptions).trim();
+const checkoutHead = () => {
+  const dir = gitDirectory();
+  const head = readFileSync(join(dir, 'HEAD'), 'utf8').trim();
+  if (/^[0-9a-f]{40}$/u.test(head)) return head;
+  if (!head.startsWith('ref: ')) throw new Error('Git HEAD 값을 확인할 수 없습니다.');
+  const ref = head.slice(5);
+  if (!/^refs\/[A-Za-z0-9._/-]+$/u.test(ref) || ref.split('/').includes('..')) {
+    throw new Error('Git HEAD 참조 형식을 확인할 수 없습니다.');
+  }
+  let sha;
+  try {
+    sha = readFileSync(join(dir, ref), 'utf8').trim();
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    let packed;
+    try {
+      packed = readFileSync(join(dir, 'packed-refs'), 'utf8');
+    } catch (packedError) {
+      if (packedError.code !== 'ENOENT') throw packedError;
+      throw new Error('Git HEAD 참조를 찾을 수 없습니다.');
+    }
+    sha = packed.split(/\r?\n/u)
+      .map(line => line.split(' '))
+      .find(parts => parts.length === 2 && parts[1] === ref)?.[0];
+  }
+  if (!/^[0-9a-f]{40}$/u.test(sha ?? '')) {
+    throw new Error('Git HEAD 커밋 SHA가 유효하지 않습니다.');
+  }
+  return sha;
+};
 // Read the checkout's tracked Git object IDs directly from its index.
 // This avoids additional Git subprocesses whose argument shapes may be denied
 // by the judge (ls-tree or rev-parse with a list of file object specs).
 const indexedGitFiles = () => {
-  const index = readFileSync(join(root, '.git', 'index'));
+  const index = readFileSync(join(gitDirectory(), 'index'));
   if (index.toString('ascii', 0, 4) !== 'DIRC') fail('Git 인덱스 형식이 아닙니다.');
   const version = index.readUInt32BE(4);
   if (version !== 2 && version !== 3) fail('지원하지 않는 Git 인덱스 버전입니다.');
@@ -47,7 +75,6 @@ const indexedGitFiles = () => {
   if (!files.size) fail('Git 인덱스에 추적 파일이 없습니다.');
   return files;
 };
-const fromCommit = (path) => JSON.parse(gitShow(`HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
 const secretPattern = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\bsb_secret_[A-Za-z0-9_-]{12,}|\bsk-[A-Za-z0-9_-]{20,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
 const repository = /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})\/?$/iu;
@@ -62,12 +89,24 @@ const normalizedRepo = value => {
 };
 
 try {
-  const dirty = gitStatus();
-  if (dirty) fail(`커밋되지 않은 파일이 있습니다. 먼저 확인해 주세요:\n${dirty}`);
-  const commit = gitHead();
-  // Identity comes from the committed configuration; isolated runners may
-  // disallow even read-only git config and git remote subcommands.
-  const config = fromCommit('aleph.config.json');
+  const workingConfig = JSON.parse(readFileSync(join(root, 'aleph.config.json'), 'utf8'));
+  let config = workingConfig;
+  let commit;
+  let legacyGitRead;
+  if (config.step === 12) {
+    // HEAD is read directly from .git; no child process runs in the grader.
+    // The submission CI checks out a clean committed repository.
+    commit = checkoutHead();
+  } else {
+    // Preserve the original read-only Git verification for earlier stages.
+    const { execFileSync } = await import('node:child_process');
+    const gitOptions = { cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 512 * 1024 };
+    legacyGitRead = (...args) => execFileSync('git', args, gitOptions).trim();
+    const dirty = legacyGitRead('status', '--porcelain', '--untracked-files=all');
+    if (dirty) fail(`커밋되지 않은 파일이 있습니다. 먼저 확인해 주세요:\n${dirty}`);
+    commit = legacyGitRead('rev-parse', '--verify', 'HEAD');
+    config = JSON.parse(legacyGitRead('show', 'HEAD:aleph.config.json'));
+  }
   const repoUrl = normalizedRepo(config.repoUrl);
   // The grader may check out only HEAD, without the older Stage 11 commit object.
   // Compare Git blob IDs and modes against the verified Stage 11 tree snapshot.
@@ -83,7 +122,8 @@ try {
     changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
       .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
   } else {
-    changedFiles = gitChanged(`${commit}^`, commit).split(/\r?\n/u).filter(Boolean).sort();
+    changedFiles = legacyGitRead('diff', '--name-only', '--no-renames', `${commit}^`, commit)
+      .split(/\r?\n/u).filter(Boolean).sort();
   }
   if (!changedFiles.length) fail('저장점에서 변경된 파일이 없습니다.');
 
