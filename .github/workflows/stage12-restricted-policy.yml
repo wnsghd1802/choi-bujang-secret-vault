@@ -1,0 +1,46 @@
+name: Stage12 restricted runtime policy test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  restricted-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify no packages installed
+        run: test ! -d node_modules
+      - name: Ensure policy rejects forbidden external commands
+        env:
+          STAGE12_POLICY_SELF_TEST: '1'
+          NODE_OPTIONS: '--require=./.github/tools/stage12-policy-preload.cjs'
+        run: |
+          node -e "const c=require('node:child_process');try{c.execFileSync('sh',['-c','true']);process.exit(1)}catch(e){if(!e.message.startsWith('STAGE12_POLICY_REJECT:'))throw e;console.log('External command correctly rejected')}"
+      - name: Ensure policy rejects write requests before networking
+        env:
+          STAGE12_POLICY_SELF_TEST: '1'
+          NODE_OPTIONS: '--require=./.github/tools/stage12-policy-preload.cjs'
+        run: |
+          node -e "(async()=>{try{await fetch('https://choi-bujang-secret-vault-pied.vercel.app/api/notes',{method:'POST'});process.exit(1)}catch(e){if(!e.message.startsWith('STAGE12_POLICY_REJECT:'))throw e;console.log('HTTPS POST correctly rejected')}})()"
+      - name: Execute actual npm bundle under policy
+        env:
+          NODE_OPTIONS: '--require=./.github/tools/stage12-policy-preload.cjs'
+        run: npm run bundle
+      - name: Validate bundle only records two executed probes
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            const j = JSON.parse(fs.readFileSync('artifacts/submission.json', 'utf8'));
+            const skipped = j.attackAttempts.filter(x => x.observed === 'not_run').length;
+            if (j.step !== 12 || j.attackAttempts.length !== 14 || skipped !== 12)
+              throw new Error('Unexpected bundle result or missing not_run records');
+            console.log('Stage', j.step, 'probes', j.attackAttempts.length, 'not_run', skipped);
+          "
