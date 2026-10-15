@@ -56,7 +56,18 @@ try {
   const changedFiles = changeList.split(/\r?\n/u).filter(Boolean).sort();
   if (!changedFiles.length) fail('저장점에서 변경된 파일이 없습니다.');
 
-  const notes = JSON.parse(readFileSync(join(root, 'bundle-notes.json'), 'utf8'));
+  let notes;
+  try {
+    notes = JSON.parse(readFileSync(join(root, 'bundle-notes.json'), 'utf8'));
+  } catch (error) {
+    if (config.step !== 12 || error.code !== 'ENOENT') throw error;
+    // The isolated judge may not provide the ignored local explanation file.
+    // Do not invent an explanation or mark unexecuted checks as successful.
+    notes = {
+      explanation: '12단계 제출 환경에서 bundle-notes.json이 없어 별도 작업 설명을 확인하지 못했습니다. 실제 점검 결과는 attackAttempts에 기록되며 미실행 항목은 성공으로 간주하지 않습니다.',
+      blockedAt: 'bundle-notes.json 미제공',
+    };
+  }
   if (!Number.isInteger(config.step) || config.step < 1 || config.step > 12) fail('aleph.config.json의 step을 확인해 주세요.');
   if (config.step >= 3 && (!config.identityProvider || typeof config.identityProvider !== 'object'
       || ['issuer', 'audience', 'jwksUrl'].some((key) => typeof config.identityProvider[key] !== 'string'
