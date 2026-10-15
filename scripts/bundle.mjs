@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RULE_IDS } from '../src/decider.mjs';
-import { runAttackChecks } from '../src/stage12-attack-check.mjs';
+import { runAttackChecks } from '../src/attack-check.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const gitOptions = {
