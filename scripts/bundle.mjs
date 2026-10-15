@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RULE_IDS } from '../src/decider.mjs';
@@ -10,14 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // the checked-out repository without spawning any command for Stage 12.
 const gitDirectory = () => {
   const marker = join(root, '.git');
-  // A regular checkout has .git/HEAD; a worktree uses a .git pointer file.
-  // Only the already-allowed readFileSync is used in the isolated bundle.
-  try {
-    readFileSync(join(marker, 'HEAD'), 'utf8');
-    return marker;
-  } catch (error) {
-    if (error.code !== 'ENOTDIR' && error.code !== 'ENOENT') throw error;
-  }
+  if (statSync(marker).isDirectory()) return marker;
   const match = readFileSync(marker, 'utf8').trim().match(/^gitdir: (.+)$/u);
   if (!match) throw new Error('Git 작업 디렉터리를 확인할 수 없습니다.');
   return resolve(root, match[1]);
@@ -52,22 +44,35 @@ const checkoutHead = () => {
   }
   return sha;
 };
-// Query the Git index through Git's read-only tracked-file interface.
-// --stage supplies the blob ID and mode; -z preserves exact file names.
-// This works on shallow checkouts without parsing .git/index ourselves.
-const trackedGitFiles = () => {
-  const listing = execFileSync('git', ['ls-files', '--stage', '-z'], {
-    cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 2 * 1024 * 1024,
-  });
+// Read the checkout's tracked Git object IDs directly from its index.
+// This avoids additional Git subprocesses whose argument shapes may be denied
+// by the judge (ls-tree or rev-parse with a list of file object specs).
+const indexedGitFiles = () => {
+  const index = readFileSync(join(gitDirectory(), 'index'));
+  if (index.toString('ascii', 0, 4) !== 'DIRC') fail('Git 인덱스 형식이 아닙니다.');
+  const version = index.readUInt32BE(4);
+  if (version !== 2 && version !== 3) fail('지원하지 않는 Git 인덱스 버전입니다.');
+  const count = index.readUInt32BE(8);
+  if (count > 10000) fail('Git 인덱스 파일 수를 확인해 주세요.');
   const files = new Map();
-  for (const entry of listing.split('\0')) {
-    if (!entry) continue;
-    const match = entry.match(/^(\d{6}) ([0-9a-f]{40}) ([0-3])\t([\s\S]+)$/u);
-    if (!match || match[3] !== '0' || !['100644', '100755', '120000', '160000'].includes(match[1])
-        || files.has(match[4])) fail('Git 추적 파일 목록을 확인할 수 없습니다.');
-    files.set(match[4], `${match[1]}:${match[2]}`);
+  let offset = 12;
+  for (let i = 0; i < count; i++) {
+    if (offset + 62 > index.length - 20) fail('Git 인덱스 항목이 손상되었습니다.');
+    const mode = index.readUInt32BE(offset + 24).toString(8);
+    const objectId = index.subarray(offset + 40, offset + 60).toString('hex');
+    const flags = index.readUInt16BE(offset + 60);
+    const start = offset + 62 + ((flags & 0x4000) ? 2 : 0);
+    const end = index.indexOf(0, start);
+    if (end < start || end > index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
+    const name = index.toString('utf8', start, end);
+    if (!name || files.has(name) || !/^(100[0-7]{3}|120000|160000)$/u.test(mode)) {
+      fail('Git 인덱스 파일 정보가 올바르지 않습니다.');
+    }
+    files.set(name, `${mode}:${objectId}`);
+    const length = end + 1 - offset;
+    offset += length + ((8 - (length % 8)) % 8);
   }
-  if (!files.size) fail('Git 추적 파일이 없습니다.');
+  if (!files.size) fail('Git 인덱스에 추적 파일이 없습니다.');
   return files;
 };
 const fail = (message) => { throw new Error(message); };
@@ -113,7 +118,7 @@ try {
         || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
       fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
     }
-    const currentFiles = trackedGitFiles();
+    const currentFiles = indexedGitFiles();
     changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
       .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
   } else {
