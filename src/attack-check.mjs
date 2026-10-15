@@ -36,10 +36,12 @@ async function runStageThreeChecks(config) {
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash
       || app.pathname !== '/' || app.hostname.endsWith('.example')) throw new Error('실제 HTTPS 배포 주소를 확인해 주세요.');
-  const get = (path, headers) => fetch(new URL(path, app), {
-    method: 'GET', ...(headers ? { headers } : {}),
-    redirect: 'error', signal: AbortSignal.timeout(10000),
-  });
+  const get = config.step === 12
+    ? path => fetch(new URL(path, app), { method: 'GET', redirect: 'error' })
+    : (path, headers) => fetch(new URL(path, app), {
+      method: 'GET', ...(headers ? { headers } : {}),
+      redirect: 'error', signal: AbortSignal.timeout(10000),
+    });
   const results = [];
   const id = '00000000-0000-4000-8000-000000000003';
   for (const [attackId, path, method, token] of [
@@ -54,6 +56,12 @@ async function runStageThreeChecks(config) {
   ]) {
     // The isolated bundle runner permits GET/HEAD only; do not send write requests.
     if (method !== 'GET') {
+      results.push({ attackId, expected: '인증 없는 요청은 JSON 오류와 401 또는 403',
+        observed: 'not_run' });
+      continue;
+    }
+    // A GET with an Authorization header is not an anonymous public check.
+    if (config.step === 12 && token) {
       results.push({ attackId, expected: '인증 없는 요청은 JSON 오류와 401 또는 403',
         observed: 'not_run' });
       continue;
