@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { RULE_IDS } from '../src/decider.mjs';
 import { runAttackChecks } from '../src/stage12-attack-check.mjs';
 
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (...args) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 512 * 1024,
 }).trim();
