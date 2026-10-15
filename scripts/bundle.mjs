@@ -16,33 +16,36 @@ const gitHead = () => execFileSync('git', ['rev-parse', '--verify', 'HEAD'], git
 const gitShow = (revisionPath) => execFileSync('git', ['show', revisionPath], gitOptions).trim();
 const gitChanged = (base, revision) => execFileSync('git',
   ['diff', '--name-only', '--no-renames', base, revision], gitOptions).trim();
-// Enumerate tracked files with Git show (tree listings) and read their blob IDs
-// with Git rev-parse. Neither command modifies the repository.
-const gitTreeFiles = (revision) => {
-  const paths = [];
-  const visit = (folder) => {
-    const listing = gitShow(`${revision}:${folder}`).split(/\r?\n/u);
-    if (listing[0] !== `tree ${revision}:${folder}` || listing[1] !== '') {
-      fail('Git show의 파일 목록을 읽을 수 없습니다.');
+// Read the checkout's tracked Git object IDs directly from its index.
+// This avoids additional Git subprocesses whose argument shapes may be denied
+// by the judge (ls-tree or rev-parse with a list of file object specs).
+const indexedGitFiles = () => {
+  const index = readFileSync(join(root, '.git', 'index'));
+  if (index.toString('ascii', 0, 4) !== 'DIRC') fail('Git 인덱스 형식이 아닙니다.');
+  const version = index.readUInt32BE(4);
+  if (version !== 2 && version !== 3) fail('지원하지 않는 Git 인덱스 버전입니다.');
+  const count = index.readUInt32BE(8);
+  if (count > 10000) fail('Git 인덱스 파일 수를 확인해 주세요.');
+  const files = new Map();
+  let offset = 12;
+  for (let i = 0; i < count; i++) {
+    if (offset + 62 > index.length - 20) fail('Git 인덱스 항목이 손상되었습니다.');
+    const mode = index.readUInt32BE(offset + 24).toString(8);
+    const objectId = index.subarray(offset + 40, offset + 60).toString('hex');
+    const flags = index.readUInt16BE(offset + 60);
+    const start = offset + 62 + ((flags & 0x4000) ? 2 : 0);
+    const end = index.indexOf(0, start);
+    if (end < start || end > index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
+    const name = index.toString('utf8', start, end);
+    if (!name || files.has(name) || !/^(100[0-7]{3}|120000|160000)$/u.test(mode)) {
+      fail('Git 인덱스 파일 정보가 올바르지 않습니다.');
     }
-    for (const item of listing.slice(2)) {
-      if (!item) continue;
-      if (item.startsWith('"') || item.includes('\\')) fail('인용된 Git 경로를 확인해 주세요.');
-      const directory = item.endsWith('/');
-      const filename = folder ? `${folder}/${directory ? item.slice(0, -1) : item}`
-        : directory ? item.slice(0, -1) : item;
-      if (directory) visit(filename);
-      else paths.push(filename);
-    }
-  };
-  visit('');
-  if (!paths.length) fail('HEAD의 Git 파일 목록이 비어 있습니다.');
-  const ids = execFileSync('git', ['rev-parse', ...paths.map(path => `${revision}:${path}`)],
-    gitOptions).trim().split(/\r?\n/u);
-  if (ids.length !== paths.length || ids.some(id => !/^[0-9a-f]{40}$/u.test(id))) {
-    fail('Git 파일 객체 ID를 확인할 수 없습니다.');
+    files.set(name, `${mode}:${objectId}`);
+    const length = end + 1 - offset;
+    offset += length + ((8 - (length % 8)) % 8);
   }
-  return new Map(paths.map((path, i) => [path, `100644:${ids[i]}`]));
+  if (!files.size) fail('Git 인덱스에 추적 파일이 없습니다.');
+  return files;
 };
 const fromCommit = (path) => JSON.parse(gitShow(`HEAD:${path}`));
 const fail = (message) => { throw new Error(message); };
@@ -76,7 +79,7 @@ try {
         || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
       fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
     }
-    const currentFiles = gitTreeFiles(commit);
+    const currentFiles = indexedGitFiles();
     changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
       .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
   } else {

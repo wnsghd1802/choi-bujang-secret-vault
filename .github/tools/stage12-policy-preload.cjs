@@ -44,11 +44,9 @@ if (isBundle || process.env.STAGE12_POLICY_SELF_TEST === '1') {
     if (!Array.isArray(args) || args.some(a => typeof a !== 'string')) return false;
     const [verb, ...rest] = args;
     if (verb === 'status') return rest.join(' ') === '--porcelain --untracked-files=all';
-    // The script only resolves tree/blob identifiers; it never writes Git objects.
-    const objectSpec = /^(?:HEAD|[0-9a-f]{40}):[A-Za-z0-9._/\[\]-]*$/u;
-    if (verb === 'rev-parse') return rest.join(' ') === '--verify HEAD' ||
-      (rest.length > 0 && rest.every(r => objectSpec.test(r)));
-    if (verb === 'show') return rest.length === 1 && objectSpec.test(rest[0]);
+    // Stage 12 only needs the HEAD commit and its committed config.
+    if (verb === 'rev-parse') return rest.join(' ') === '--verify HEAD';
+    if (verb === 'show') return rest.length === 1 && rest[0] === 'HEAD:aleph.config.json';
     if (verb === 'diff') return rest.length === 4 && rest[0] === '--name-only' &&
       rest[1] === '--no-renames' && rest.slice(2).every(r => /^[0-9a-f]{40}$/u.test(r));
     return false;
