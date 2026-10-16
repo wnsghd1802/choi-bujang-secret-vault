@@ -62,7 +62,7 @@ const indexedGitFiles = () => {
     throw error;
   }
   if (index.length < 12 || index.toString('ascii', 0, 4) !== 'DIRC'
-      || ![2, 3].includes(index.readUInt32BE(4))) {
+      || ![2, 3, 4].includes(index.readUInt32BE(4))) {
     fail('Git 인덱스 형식을 확인할 수 없어 추적 파일을 검증할 수 없습니다.');
   }
   const version = index.readUInt32BE(4);
@@ -70,21 +70,43 @@ const indexedGitFiles = () => {
   if (count > 10000) fail('Git 인덱스 파일 수를 확인해 주세요.');
   const files = new Map();
   let offset = 12;
+  let previousName = Buffer.alloc(0);
   for (let i = 0; i < count; i++) {
     if (offset + 62 > index.length - 20) fail('Git 인덱스 항목이 손상되었습니다.');
     const mode = index.readUInt32BE(offset + 24).toString(8);
     const objectId = index.subarray(offset + 40, offset + 60).toString('hex');
     const flags = index.readUInt16BE(offset + 60);
-    const start = offset + 62 + ((flags & 0x4000) ? 2 : 0);
-    const end = index.indexOf(0, start);
-    if (end < start || end > index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
-    const name = index.toString('utf8', start, end);
+    let start = offset + 62 + ((flags & 0x4000) ? 2 : 0);
+    let end;
+    let name;
+    if (version === 4) {
+      // V4 stores a varint number of bytes to remove from the previous path,
+      // then a NUL-terminated suffix; unlike V2/V3 it has no entry padding.
+      let strip = 0;
+      let byte;
+      do {
+        if (start >= index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
+        byte = index[start++];
+        strip = strip * 128 + (byte & 0x7f) + ((byte & 0x80) ? 1 : 0);
+        if (strip > previousName.length) fail('Git 인덱스 경로 압축이 올바르지 않습니다.');
+      } while (byte & 0x80);
+      end = index.indexOf(0, start);
+      if (end < start || end >= index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
+      previousName = Buffer.concat([previousName.subarray(0, previousName.length - strip),
+        index.subarray(start, end)]);
+      name = previousName.toString('utf8');
+      offset = end + 1;
+    } else {
+      end = index.indexOf(0, start);
+      if (end < start || end >= index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
+      name = index.toString('utf8', start, end);
+      const length = end + 1 - offset;
+      offset += length + ((8 - (length % 8)) % 8);
+    }
     if (!name || files.has(name) || !/^(100[0-7]{3}|120000|160000)$/u.test(mode)) {
       fail('Git 인덱스 파일 정보가 올바르지 않습니다.');
     }
     files.set(name, `${mode}:${objectId}`);
-    const length = end + 1 - offset;
-    offset += length + ((8 - (length % 8)) % 8);
   }
   if (!files.size) fail('Git 인덱스에 추적 파일이 없습니다.');
   return files;
