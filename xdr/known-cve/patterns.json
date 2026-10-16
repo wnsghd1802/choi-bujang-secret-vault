@@ -1,0 +1,31 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "known-cve",
+  "cve": "CVE-2021-44228",
+  "mitre": "T1190",
+  "blockThreshold": 0.85,
+  "alertThreshold": 0.5,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    {
+      "name": "jndi-remote-header",
+      "condition": "Request user-agent or HTTP header contains complete ${jndi:<remote-scheme>://...} lookup",
+      "evidence": "CVE-2021-44228: attacker-supplied logged HTTP header can trigger Log4j JNDI lookup"
+    },
+    {
+      "name": "jndi-remote-query",
+      "condition": "Request URL or query parameter contains complete ${jndi:<remote-scheme>://...} lookup",
+      "evidence": "CVE-2021-44228 / MITRE ATT&CK T1190: vulnerable HTTP input used for remote lookup"
+    },
+    {
+      "name": "cve-reference-review",
+      "condition": "CVE-2021-44228, log4j, or JNDI reference without complete lookup syntax",
+      "evidence": "NVD CVE-2021-44228 and ATT&CK T1190: references alone are not proof of exploitation"
+    },
+    {
+      "name": "scanner-trace-review",
+      "condition": "Exploit scan/check/lookup hint or T1190-labelled vulnerability alert without complete lookup",
+      "evidence": "MITRE ATT&CK T1190: reconnaissance/scan hints require review, not an automatic block"
+    }
+  ]
+}

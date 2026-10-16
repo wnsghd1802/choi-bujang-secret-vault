@@ -501,3 +501,11 @@ aleph.config.json은 단계 5와 실제 메모 API의 allowedRoutes를 기록합
 변경을 `5단계 저장점`으로 커밋·배포한 뒤 확인합니다. 제외된 bundle-notes.json에 실제 확인과 미확인 사항을 구분해 적고 npm run bundle을 실행합니다. 제출 묶음은 커밋하지 않습니다.
 
 자동 점검은 익명 거부·공개 자료·메타데이터·헤더·브라우저 키 비노출을 검사합니다. 원본 직접 읽기 검사는 로컬 SUPABASE_PUBLISHABLE_KEY가 있을 때만 실행하고 없으면 미실행으로 기록합니다. 실제 A/B 로그인 및 교차 접근 검사를 수행하지 않았으면 수행했다고 기록하지 않습니다.
+
+## 보너스 XDR-03 · 공개 취약점 악용 감지 (2026-10-16)
+
+`xdr/known-cve/decide.mjs`는 CVE-2021-44228의 실제 HTTP JNDI 원격 조회 형태가 확인되면 `block`, CVE 또는 점검 단서만 있는 경보는 `alert`, 정상 사건은 `record`로 분류합니다. MITRE ATT&CK T1190 단독 또는 높은 Wazuh 심각도만으로 차단하지 않습니다. 독립 심판이 판정기를 직접 불러오므로 이 모듈에는 import·파일 I/O·네트워크 접근이 없습니다.
+
+`xdr/known-cve/read-alerts.mjs`는 시험용 Wazuh 경보 5개 필드만 비밀값을 가리고 읽습니다. `xdr/known-cve/respond.mjs`는 결과와 별도로 만료가 있는 임시 거부 규칙, 신뢰한 현재 요청의 악용 여부 확인 후 ZTNA 거부 응답, 최소 감사 로그 기록을 담당합니다. 기존 `src/decider.mjs`나 SDP 엔진은 변경하지 않습니다. 실제 운영 연결은 신뢰 가능한 IP/요청 검증기와 엔진에 등록된 거부 응답 공급자가 필요합니다.
+
+재실행: `npm run xdr:run -- known-cve` 및 `node --test test/known-cve.test.mjs`. 판정 결과는 `xdr/known-cve/result.json`에 저장되며 수업용 모의 경보 테스트일 뿐 운영 차단을 증명하지 않습니다. 참고: NVD CVE-2021-44228, MITRE ATT&CK T1190.
