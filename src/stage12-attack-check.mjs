@@ -1,5 +1,5 @@
-// Stage 12 bundle checks: only the two anonymous public HTTPS GET probes needed here.
-// Every other check stays explicitly unexecuted in the isolated submission runner.
+// Stage 12: send exactly two anonymous GET requests and record their actual HTTP statuses.
+// The other checks remain not_run. No cookies, authentication, request body, or write methods.
 const result = (attackId, expected, observed = 'not_run') => ({ attackId, expected, observed });
 const deniedExpected = '인증 없는 요청은 JSON 오류와 401 또는 403';
 
@@ -12,27 +12,38 @@ export async function runAttackChecks(config) {
     throw new Error('실제 HTTPS 배포 주소를 확인해 주세요.');
   }
 
-  const getDenied = async (attackId, path) => {
+  const anonymousGet = async (attackId, path) => {
     const url = new URL(path, app);
     if (url.protocol !== 'https:' || url.origin !== app.origin) {
       throw new Error('공개 HTTPS 배포 주소의 GET만 실행할 수 있습니다.');
     }
-    const response = await fetch(url.href, { method: 'GET' });
-    const payload = await response.json().catch(() => null);
-    const denied = [401, 403].includes(response.status) && typeof payload?.error === 'string';
-    return result(
-      attackId,
-      deniedExpected,
-      denied ? `JSON 오류로 거부 (HTTP ${response.status})`
-        : `거부 조건 불충족 (HTTP ${response.status})`,
-    );
+
+    try {
+      // Do not follow redirects to another host and do not infer a successful denial.
+      // A real HTTP response is recorded even when its status is unexpected.
+      const response = await fetch(url.href, {
+        method: 'GET',
+        credentials: 'omit',
+        redirect: 'manual',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15000),
+      });
+      return result(attackId, deniedExpected, `HTTP ${response.status}`);
+    } catch {
+      // An attempted request without an HTTP response must never claim 401/403.
+      return result(attackId, deniedExpected, 'HTTP 응답 없음 (요청 실패)');
+    }
   };
 
+  // These two requests are made sequentially in this very bundle execution.
+  const noteList = await anonymousGet('anonymous_note_list', '/api/notes');
   const id = '00000000-0000-4000-8000-000000000003';
+  const noteRead = await anonymousGet('anonymous_note_read', `/api/notes/${id}`);
+
   return [
-    await getDenied('anonymous_note_list', '/api/notes'),
+    noteList,
     result('anonymous_note_create', deniedExpected),
-    await getDenied('anonymous_note_read', `/api/notes/${id}`),
+    noteRead,
     result('anonymous_note_update', deniedExpected),
     result('anonymous_note_delete', deniedExpected),
     result('anonymous_notice_update', deniedExpected),
