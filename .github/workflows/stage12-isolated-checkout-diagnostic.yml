@@ -1,7 +1,7 @@
 name: Stage12 isolated checkout diagnostic
 on:
   push:
-    branches: [main]
+    branches: [main, stage12-manifest-no-index-lab-20261016]
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,3 +29,32 @@ jobs:
           test ! -d node_modules && echo 'No node_modules present'
       - name: Run exact bundle with no package installation or local notes
         run: npm run bundle
+      - name: Verify manifest equals actual full-history Git diff
+        if: matrix.depth == 0
+        shell: bash
+        run: |
+          git diff --name-only --no-renames fd087248b89674aadc256d677972301e8b92f5cf HEAD > "$RUNNER_TEMP/stage12-verified-names.txt"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import assert from "node:assert/strict";
+            const j = JSON.parse(fs.readFileSync("artifacts/submission.json", "utf8"));
+            const actual = fs.readFileSync(process.env.RUNNER_TEMP + "/stage12-verified-names.txt", "utf8").trim().split("\n").sort();
+            assert.deepEqual(j.changedFiles, actual);
+            console.log("Verified manifest against independent Git diff:", actual.length);
+          '
+      - name: Verify bundle with missing Git index
+        shell: bash
+        run: |
+          test -f .git/index
+          mv .git/index .git/index.disabled-for-stage12-test
+          rm -f artifacts/submission.json
+          npm run bundle
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import fs from "node:fs";
+            const j = JSON.parse(fs.readFileSync("artifacts/submission.json", "utf8"));
+            assert.equal(j.changedFiles.length, 22);
+            assert.equal(j.attackAttempts.filter(x => x.observed === "not_run").length, 12);
+            console.log("Bundle without index verified", j.step, j.attackAttempts.length);
+          '
+          mv .git/index.disabled-for-stage12-test .git/index
