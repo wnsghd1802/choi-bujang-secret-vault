@@ -1,0 +1,43 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "privilege",
+  "mitre": [
+    "T1068",
+    "T1078"
+  ],
+  "blockThreshold": 0.85,
+  "alertThreshold": 0.5,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    {
+      "name": "unexpected-admin-group-grant",
+      "condition": "An ordinary account is assigned Administrators from an unfamiliar source, while using admin commands, or as part of mass account grants",
+      "evidence": "MITRE ATT&CK T1078: unauthorized use of a valid account with unexpected administrative group privileges"
+    },
+    {
+      "name": "post-elevation-command",
+      "condition": "An account just gained administrator privilege then executes administrator commands, or the privilege appears from an unknown source",
+      "evidence": "MITRE ATT&CK T1068 and T1078: unexpected elevation followed by privileged activity"
+    },
+    {
+      "name": "unusual-admin-command",
+      "condition": "Administrator command outside working/class hours from a previously unseen source",
+      "evidence": "MITRE ATT&CK T1078: abnormal time and origin can indicate stolen credential use"
+    },
+    {
+      "name": "cross-account-admin-use",
+      "condition": "A user invokes a privileged command with another account's authority",
+      "evidence": "MITRE ATT&CK T1078: another legitimate account's privileges are used"
+    },
+    {
+      "name": "rapid-admin-regrant",
+      "condition": "Removed administrator membership is rapidly restored",
+      "evidence": "MITRE ATT&CK T1078: unexpected reinstatement of administrator privileges"
+    },
+    {
+      "name": "privilege-review",
+      "condition": "Unconfirmed administrator/group/privileged-action warning without sufficient combined evidence for denial",
+      "evidence": "MITRE ATT&CK T1068 and T1078: an incomplete privilege signal warrants alert rather than automatic blocking"
+    }
+  ]
+}

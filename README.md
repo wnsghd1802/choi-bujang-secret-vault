@@ -518,3 +518,12 @@ aleph.config.json은 단계 5와 실제 메모 API의 allowedRoutes를 기록합
 `xdr/persistence/read-alerts.mjs`는 Wazuh 시험 경보의 다섯 필드만 비밀값을 제거하여 읽습니다. `xdr/persistence/respond.mjs`는 신뢰할 수 있는 Wazuh 에이전트의 PC 식별자를 기반으로 임시 격리 규칙(15분·근거 경보 ID)을 관리하고 `xdr/alerts.log`에 비밀값 없는 최소 알림을 저장합니다. 실제 SDP 집행은 엔진이 확인한 PC 식별자와 등록된 거부 응답 생성기를 연결한 경우에만 성립합니다. 기존 `src/decider.mjs`, 로그인 및 1~12단계 기능은 그대로 유지합니다.
 
 재실행: `npm run xdr:run -- persistence` 및 `node --test test/persistence.test.mjs`. `xdr/persistence/result.json`의 모의 분류 결과만으로 운영 PC 격리가 실제 집행됐다고 간주하지 않습니다.
+
+
+## 보너스 XDR-05 · 권한 가로채기 탐지 (2026-10-16)
+
+`xdr/privilege/decide.mjs`는 MITRE ATT&CK T1068·T1078 관련 경보에서 예기치 않은 관리자 그룹 추가, 승격 직후 관리자 명령, 다른 계정 권한 사용, 빠른 관리자 재등록, 낯선 주소와 시간의 관리자 명령을 판정합니다. 복합 증거가 명확하면 `block`, 불충분한 단서는 `alert`, 평상시 로그인·조회는 `record`로 둡니다. Wazuh 수준이나 ATT&CK 태그만으로는 차단하지 않습니다. 심판용 판단 모듈은 import·파일 I/O·네트워크 없이 독립적으로 동작합니다.
+
+`xdr/privilege/read-alerts.mjs`는 5개 필드만 비밀값을 제거해 표시합니다. `xdr/privilege/respond.mjs`는 신뢰할 수 있는 수집기에서 검증한 계정과 원본 경보 계정이 일치하고 `block`이 재검증된 경우에만 15분짜리 임시 거부 규칙을 기록합니다. 근거 경보 ID를 보존하고 `xdr/alerts.log`에는 계정·주소·명령 원문 없이 최소 알림만 추가합니다. 엔진 검증 계정 리졸버와 등록된 거부 응답 생성자를 사용하는 어댑터를 제공합니다. **실제 로그인 토큰·세션 무효화는 제공 엔진이 집행해야 하며 로컬 규칙만으로 완료됐다고 주장하지 않습니다.** 기존 ZTNA 판정기 및 1~12단계와 다른 XDR 모듈은 변경하지 않습니다.
+
+재실행: `npm run xdr:run -- privilege`, `node --test test/privilege.test.mjs`. `xdr/privilege/result.json`은 수업용 모의 경보 결과이며 운영 집행의 증거가 아닙니다.

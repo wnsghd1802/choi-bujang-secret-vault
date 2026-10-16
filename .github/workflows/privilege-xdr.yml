@@ -1,0 +1,31 @@
+name: Bonus privilege XDR verification
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'xdr/privilege/**'
+      - 'xdr/fixtures/privilege.json'
+      - 'test/privilege.test.mjs'
+      - '.github/workflows/privilege-xdr.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  xdr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run fixture without installing packages
+        run: |
+          test ! -d node_modules
+          npm run xdr:run -- privilege
+      - name: Test false positives and guarded account-session denial
+        run: node --test test/privilege.test.mjs
+      - name: Re-run fixture and compare committed result
+        run: |
+          npm run xdr:run -- privilege
+          git diff --exit-code -- xdr/privilege/result.json
