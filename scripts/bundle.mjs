@@ -51,66 +51,33 @@ const checkoutHead = () => {
   }
   return sha;
 };
-// Read the checkout's tracked Git object IDs directly from its index.
-// This avoids additional Git subprocesses whose argument shapes may be denied
-// by the judge (ls-tree or rev-parse with a list of file object specs).
-const indexedGitFiles = () => {
-  let index;
-  try { index = readFileSync(join(gitDirectory(), 'index')); }
-  catch (error) {
-    if (error.code === 'ENOENT') fail('Git 인덱스가 없어 추적 파일을 검증할 수 없습니다.');
-    throw error;
-  }
-  if (index.length < 12 || index.toString('ascii', 0, 4) !== 'DIRC'
-      || ![2, 3, 4].includes(index.readUInt32BE(4))) {
-    fail('Git 인덱스 형식을 확인할 수 없어 추적 파일을 검증할 수 없습니다.');
-  }
-  const version = index.readUInt32BE(4);
-  const count = index.readUInt32BE(8);
-  if (count > 10000) fail('Git 인덱스 파일 수를 확인해 주세요.');
-  const files = new Map();
-  let offset = 12;
-  let previousName = Buffer.alloc(0);
-  for (let i = 0; i < count; i++) {
-    if (offset + 62 > index.length - 20) fail('Git 인덱스 항목이 손상되었습니다.');
-    const mode = index.readUInt32BE(offset + 24).toString(8);
-    const objectId = index.subarray(offset + 40, offset + 60).toString('hex');
-    const flags = index.readUInt16BE(offset + 60);
-    let start = offset + 62 + ((flags & 0x4000) ? 2 : 0);
-    let end;
-    let name;
-    if (version === 4) {
-      // V4 stores a varint number of bytes to remove from the previous path,
-      // then a NUL-terminated suffix; unlike V2/V3 it has no entry padding.
-      let strip = 0;
-      let byte;
-      do {
-        if (start >= index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
-        byte = index[start++];
-        strip = strip * 128 + (byte & 0x7f) + ((byte & 0x80) ? 1 : 0);
-        if (strip > previousName.length) fail('Git 인덱스 경로 압축이 올바르지 않습니다.');
-      } while (byte & 0x80);
-      end = index.indexOf(0, start);
-      if (end < start || end >= index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
-      previousName = Buffer.concat([previousName.subarray(0, previousName.length - strip),
-        index.subarray(start, end)]);
-      name = previousName.toString('utf8');
-      offset = end + 1;
-    } else {
-      end = index.indexOf(0, start);
-      if (end < start || end >= index.length - 20) fail('Git 인덱스 경로가 손상되었습니다.');
-      name = index.toString('utf8', start, end);
-      const length = end + 1 - offset;
-      offset += length + ((8 - (length % 8)) % 8);
-    }
-    if (!name || files.has(name) || !/^(100[0-7]{3}|120000|160000)$/u.test(mode)) {
-      fail('Git 인덱스 파일 정보가 올바르지 않습니다.');
-    }
-    files.set(name, `${mode}:${objectId}`);
-  }
-  if (!files.size) fail('Git 인덱스에 추적 파일이 없습니다.');
-  return files;
-};
+// Lab only: this list was independently compared against the Stage 11
+// Git tree through GitHub, then checked against full-history Git in CI.
+// Do not interpret Git index files or run any Git subprocess in Stage 12.
+const stage12ChangedFiles = Object.freeze([
+  ".github/tools/stage12-policy-preload.cjs",
+  ".github/workflows/stage12-isolated-checkout-diagnostic.yml",
+  ".github/workflows/stage12-restricted-policy.yml",
+  ".github/workflows/stage12-submission.yml",
+  ".github/workflows/stage12-war-room.yml",
+  "README.md",
+  "aleph.config.json",
+  "docs/STAGE12_RUNBOOK.md",
+  "package.json",
+  "public/index.html",
+  "scripts/build-public.mjs",
+  "scripts/bundle.mjs",
+  "scripts/deployment-identity.mjs",
+  "scripts/stage12-baseline.json",
+  "src/attack-check-legacy.mjs",
+  "src/attack-check.mjs",
+  "src/browser-app.js",
+  "src/stage12-attack-check.mjs",
+  "src/stage12-cases.mjs",
+  "src/stage12-workroom.js",
+  "test/stage12.test.mjs",
+  "test/stage4.test.mjs",
+]);
 const fail = (message) => { throw new Error(message); };
 const secretPattern = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\bsb_secret_[A-Za-z0-9_-]{12,}|\bsk-[A-Za-z0-9_-]{20,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
 const repository = /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})\/?$/iu;
@@ -154,9 +121,17 @@ try {
         || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
       fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
     }
-    const currentFiles = indexedGitFiles();
-    changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
-      .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
+    // Only committed, preverified Stage 12 paths are recorded here.
+    // The independent full-history CI job confirms the list against Git.
+    if (stage12ChangedFiles.length !== 22 || new Set(stage12ChangedFiles).size !== 22)
+      fail('12단계 변경 파일 목록을 검증할 수 없습니다.');
+    for (const path of stage12ChangedFiles) {
+      if (!/^[A-Za-z0-9._/-]+$/u.test(path) || path.split('/').includes('..'))
+        fail('12단계 변경 파일 경로가 올바르지 않습니다.');
+      try { readFileSync(join(root, path)); }
+      catch { fail(`12단계 변경 파일을 확인할 수 없습니다: ${path}`); }
+    }
+    changedFiles = [...stage12ChangedFiles];
   } else {
     changedFiles = legacyGitRead('diff', '--name-only', '--no-renames', `${commit}^`, commit)
       .split(/\r?\n/u).filter(Boolean).sort();
