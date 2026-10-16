@@ -509,3 +509,12 @@ aleph.config.json은 단계 5와 실제 메모 API의 allowedRoutes를 기록합
 `xdr/known-cve/read-alerts.mjs`는 시험용 Wazuh 경보 5개 필드만 비밀값을 가리고 읽습니다. `xdr/known-cve/respond.mjs`는 결과와 별도로 만료가 있는 임시 거부 규칙, 신뢰한 현재 요청의 악용 여부 확인 후 ZTNA 거부 응답, 최소 감사 로그 기록을 담당합니다. 기존 `src/decider.mjs`나 SDP 엔진은 변경하지 않습니다. 실제 운영 연결은 신뢰 가능한 IP/요청 검증기와 엔진에 등록된 거부 응답 공급자가 필요합니다.
 
 재실행: `npm run xdr:run -- known-cve` 및 `node --test test/known-cve.test.mjs`. 판정 결과는 `xdr/known-cve/result.json`에 저장되며 수업용 모의 경보 테스트일 뿐 운영 차단을 증명하지 않습니다. 참고: NVD CVE-2021-44228, MITRE ATT&CK T1190.
+
+
+## 보너스 XDR-04 · 지속성 프로그램 탐지 (2026-10-16)
+
+`xdr/persistence/decide.mjs`는 MITRE ATT&CK T1543(서비스 생성·변경), T1053(예약 작업), T1547.001(시작 폴더)을 바탕으로 명확한 이상 등록을 `block`, 불완전한 단서를 `alert`, 정상 활동을 `record`로 분류합니다. 단순 심각도나 MITRE 태그는 단독 차단 근거가 아닙니다. 인터넷이 없는 심판에서도 다른 파일을 불러오지 않는 독립 판정기입니다.
+
+`xdr/persistence/read-alerts.mjs`는 Wazuh 시험 경보의 다섯 필드만 비밀값을 제거하여 읽습니다. `xdr/persistence/respond.mjs`는 신뢰할 수 있는 Wazuh 에이전트의 PC 식별자를 기반으로 임시 격리 규칙(15분·근거 경보 ID)을 관리하고 `xdr/alerts.log`에 비밀값 없는 최소 알림을 저장합니다. 실제 SDP 집행은 엔진이 확인한 PC 식별자와 등록된 거부 응답 생성기를 연결한 경우에만 성립합니다. 기존 `src/decider.mjs`, 로그인 및 1~12단계 기능은 그대로 유지합니다.
+
+재실행: `npm run xdr:run -- persistence` 및 `node --test test/persistence.test.mjs`. `xdr/persistence/result.json`의 모의 분류 결과만으로 운영 PC 격리가 실제 집행됐다고 간주하지 않습니다.

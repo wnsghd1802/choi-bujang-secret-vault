@@ -1,0 +1,39 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "persistence",
+  "mitre": [
+    "T1543",
+    "T1053",
+    "T1547.001"
+  ],
+  "blockThreshold": 0.85,
+  "alertThreshold": 0.5,
+  "blockTtlSeconds": 900,
+  "patterns": [
+    {
+      "name": "unsigned-service-install",
+      "condition": "New or modified unsigned service with temporary executable path, or repeated unsigned registrations",
+      "evidence": "MITRE ATT&CK T1543: Create or Modify System Process; unsigned service installation or binary replacement"
+    },
+    {
+      "name": "suspicious-scheduled-task",
+      "condition": "Unknown, randomly named or after-hours scheduled task launching a temporary executable",
+      "evidence": "MITRE ATT&CK T1053: Scheduled Task/Job persistence and execution"
+    },
+    {
+      "name": "unlisted-startup-entry",
+      "condition": "New unlisted startup-folder executable, or unlisted reboot-persistent service in a temporary directory",
+      "evidence": "MITRE ATT&CK T1547.001: Registry Run Keys / Startup Folder; T1543: service persistence"
+    },
+    {
+      "name": "combined-autostart",
+      "condition": "Startup program and scheduled task launch the same temporary file",
+      "evidence": "MITRE ATT&CK T1053 and T1547.001: overlapping scheduled and startup persistence"
+    },
+    {
+      "name": "persistence-review",
+      "condition": "Unverified service, task, temporary executable or startup alteration lacking combined proof of malicious persistence",
+      "evidence": "MITRE ATT&CK T1543 and T1053: a single anomaly needs confirmation before isolation"
+    }
+  ]
+}

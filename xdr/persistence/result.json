@@ -1,0 +1,155 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "persistence",
+  "decisions": [
+    {
+      "alertId": "ps-01",
+      "action": "block",
+      "confidence": 0.97,
+      "reason": "unsigned-service-install"
+    },
+    {
+      "alertId": "ps-02",
+      "action": "block",
+      "confidence": 0.96,
+      "reason": "suspicious-scheduled-task"
+    },
+    {
+      "alertId": "ps-03",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "unlisted-startup-entry"
+    },
+    {
+      "alertId": "ps-04",
+      "action": "block",
+      "confidence": 0.97,
+      "reason": "unsigned-service-install"
+    },
+    {
+      "alertId": "ps-05",
+      "action": "block",
+      "confidence": 0.96,
+      "reason": "suspicious-scheduled-task"
+    },
+    {
+      "alertId": "ps-06",
+      "action": "block",
+      "confidence": 0.97,
+      "reason": "unsigned-service-install"
+    },
+    {
+      "alertId": "ps-07",
+      "action": "block",
+      "confidence": 0.99,
+      "reason": "combined-autostart"
+    },
+    {
+      "alertId": "ps-08",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "unlisted-startup-entry"
+    },
+    {
+      "alertId": "ps-09",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-10",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-11",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-12",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-13",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-14",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-15",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-16",
+      "action": "alert",
+      "confidence": 0.58,
+      "reason": "persistence-review"
+    },
+    {
+      "alertId": "ps-17",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-18",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-19",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-20",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-21",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-22",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-23",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    },
+    {
+      "alertId": "ps-24",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "normal-event"
+    }
+  ],
+  "counts": {
+    "block": 8,
+    "alert": 8,
+    "record": 8
+  }
+}
