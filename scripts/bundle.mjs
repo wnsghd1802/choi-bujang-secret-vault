@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,27 +54,16 @@ const checkoutHead = () => {
 // Read the checkout's tracked Git object IDs directly from its index.
 // This avoids additional Git subprocesses whose argument shapes may be denied
 // by the judge (ls-tree or rev-parse with a list of file object specs).
-// Fallback only for missing or non-DIRC Git indices in the isolated judge.
-const trackedGitFiles = (baseline, revision) => {
-  // A tree-to-tree diff does not inspect .git/index, even when its header is
-  // unsupported. Only read-only Git metadata is queried here.
-  const output = execFileSync('git',
-    ['diff', '--name-only', '--no-renames', baseline.commit, revision],
-    { cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 2 * 1024 * 1024 });
-  const names = output.split(/\r?\n/u).filter(Boolean);
-  if (names.length > 10000 || new Set(names).size !== names.length)
-    fail('Git 변경 파일 목록을 확인할 수 없습니다.');
-  return names.sort();
-};
-const indexedGitFiles = (baseline, revision) => {
+const indexedGitFiles = () => {
   let index;
   try { index = readFileSync(join(gitDirectory(), 'index')); }
   catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+    if (error.code === 'ENOENT') fail('Git 인덱스가 없어 추적 파일을 검증할 수 없습니다.');
+    throw error;
   }
-  if (!index || index.length < 12 || index.toString('ascii', 0, 4) !== 'DIRC'
+  if (index.length < 12 || index.toString('ascii', 0, 4) !== 'DIRC'
       || ![2, 3].includes(index.readUInt32BE(4))) {
-    return trackedGitFiles(baseline, revision);
+    fail('Git 인덱스 형식을 확인할 수 없어 추적 파일을 검증할 수 없습니다.');
   }
   const version = index.readUInt32BE(4);
   const count = index.readUInt32BE(8);
@@ -144,10 +132,9 @@ try {
         || !snapshot.files || typeof snapshot.files !== 'object' || Array.isArray(snapshot.files)) {
       fail('12단계 시작 Git 파일 목록을 확인해 주세요.');
     }
-    const currentFiles = indexedGitFiles(snapshot, commit);
-    changedFiles = Array.isArray(currentFiles) ? currentFiles
-      : [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
-        .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
+    const currentFiles = indexedGitFiles();
+    changedFiles = [...new Set([...Object.keys(snapshot.files), ...currentFiles.keys()])]
+      .filter(path => snapshot.files[path] !== currentFiles.get(path)).sort();
   } else {
     changedFiles = legacyGitRead('diff', '--name-only', '--no-renames', `${commit}^`, commit)
       .split(/\r?\n/u).filter(Boolean).sort();
