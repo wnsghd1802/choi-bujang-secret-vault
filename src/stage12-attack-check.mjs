@@ -28,10 +28,14 @@ export async function runAttackChecks(config) {
         cache: 'no-store',
         signal: AbortSignal.timeout(15000),
       });
+      // Only an actual, valid HTTP response can establish an observed status.
+      if (!Number.isInteger(response.status) || response.status < 100 || response.status > 599) {
+        return result(attackId, deniedExpected);
+      }
       return result(attackId, deniedExpected, `HTTP ${response.status}`);
     } catch {
-      // An attempted request without an HTTP response must never claim 401/403.
-      return result(attackId, deniedExpected, 'HTTP 응답 없음 (요청 실패)');
+      // No HTTP response: leave this result unverified, never infer a status.
+      return result(attackId, deniedExpected);
     }
   };
 
