@@ -34,13 +34,17 @@ jobs:
         env:
           NODE_OPTIONS: '--require=./.github/tools/stage12-policy-preload.cjs'
         run: npm run bundle
-      - name: Validate bundle only records two executed probes
+      - name: Validate CI bundle contains only unexecuted observations
         run: |
           node --input-type=module -e "
             import fs from 'node:fs';
             const j = JSON.parse(fs.readFileSync('artifacts/submission.json', 'utf8'));
             const skipped = j.attackAttempts.filter(x => x.observed === 'not_run').length;
-            if (j.step !== 12 || j.attackAttempts.length !== 14 || skipped !== 12)
+            if (j.step !== 12 || j.attackAttempts.length !== 14 || skipped !== 14)
               throw new Error('Unexpected bundle result or missing not_run records');
+            for (const id of ['anonymous_note_list', 'anonymous_note_read']) {
+              if (j.attackAttempts.find(x => x.attackId === id)?.observed !== 'not_run')
+                throw new Error('CI requests must not be attributed to the judge: ' + id);
+            }
             console.log('Stage', j.step, 'probes', j.attackAttempts.length, 'not_run', skipped);
           "
