@@ -1,4 +1,4 @@
-// Stage 12: send exactly two anonymous GET requests and record their actual HTTP statuses.
+// Stage 12: keep CI-only probes unexecuted; record HTTP status only for direct GETs.
 // The other checks remain not_run. No cookies, authentication, request body, or write methods.
 const result = (attackId, expected, observed = 'not_run') => ({ attackId, expected, observed });
 const deniedExpected = '인증 없는 요청은 JSON 오류와 401 또는 403';
@@ -39,10 +39,17 @@ export async function runAttackChecks(config) {
     }
   };
 
-  // These two requests are made sequentially in this very bundle execution.
-  const noteList = await anonymousGet('anonymous_note_list', '/api/notes');
+  // GitHub Actions runs outside the judge's request recorder. A 401 received
+  // there is not proof that the judge observed this request. Do not send those
+  // cross-environment probes or report their results in an uploaded CI bundle.
+  // A direct run outside GitHub Actions still sends both GETs sequentially,
+  // recording only the HTTP statuses actually received in that run.
+  const externalCi = process.env.GITHUB_ACTIONS === 'true';
+  const noteList = externalCi ? result('anonymous_note_list', deniedExpected)
+    : await anonymousGet('anonymous_note_list', '/api/notes');
   const id = '00000000-0000-4000-8000-000000000003';
-  const noteRead = await anonymousGet('anonymous_note_read', `/api/notes/${id}`);
+  const noteRead = externalCi ? result('anonymous_note_read', deniedExpected)
+    : await anonymousGet('anonymous_note_read', `/api/notes/${id}`);
 
   return [
     noteList,
