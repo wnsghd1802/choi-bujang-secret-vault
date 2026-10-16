@@ -1,0 +1,31 @@
+name: Bonus exfiltration XDR verification
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'xdr/exfiltration/**'
+      - 'xdr/fixtures/exfiltration.json'
+      - 'test/exfiltration.test.mjs'
+      - '.github/workflows/exfiltration-xdr.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  xdr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run first offline fixture replay
+        run: |
+          test ! -d node_modules
+          npm run xdr:run -- exfiltration
+      - name: Check false positives, pattern evidence and destination guard
+        run: node --test test/exfiltration.test.mjs
+      - name: Rerun fixture and compare committed output
+        run: |
+          npm run xdr:run -- exfiltration
+          git diff --exit-code -- xdr/exfiltration/result.json

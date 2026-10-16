@@ -1,0 +1,44 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "exfiltration",
+  "mitre": [
+    "T1041",
+    "T1048"
+  ],
+  "blockThreshold": 0.85,
+  "alertThreshold": 0.5,
+  "blockTtlSeconds": 900,
+  "minimumBulkBytes": 50000000,
+  "patterns": [
+    {
+      "name": "unknown-destination-bulk",
+      "condition": "Outbound transfer >=50MB to newly seen destination, with file batch, archive or repeated copying",
+      "evidence": "MITRE ATT&CK T1048: exfiltration over alternate protocol plus novel destination and large volume"
+    },
+    {
+      "name": "offhours-archive-transfer",
+      "condition": "An >=50MB archive sent outside work/class hours to a newly seen address",
+      "evidence": "MITRE ATT&CK T1048: suspicious external archive egress after business hours"
+    },
+    {
+      "name": "repeated-bulk-egress",
+      "condition": "High-volume outbound transfer >=50MB repeated at least five times to a destination",
+      "evidence": "MITRE ATT&CK T1041: repeated data movement over command-and-control or another communication channel"
+    },
+    {
+      "name": "unusual-port-egress",
+      "condition": "High-volume multi-file outbound transfer >=50MB over a port not normally used",
+      "evidence": "MITRE ATT&CK T1048: abnormal transfer protocol or port with substantial outgoing volume"
+    },
+    {
+      "name": "full-collection-export",
+      "condition": "At least 100 documents or whole vault copied outside in >=50MB burst",
+      "evidence": "MITRE ATT&CK T1041: bulk collection egress over a communications channel"
+    },
+    {
+      "name": "exfil-review",
+      "condition": "Unverified destination, uncommon transfer, archive or T1041/T1048 tag without sufficient combined evidence",
+      "evidence": "MITRE ATT&CK T1041 and T1048: partial indicators need investigation, not automatic block"
+    }
+  ]
+}

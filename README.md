@@ -527,3 +527,12 @@ aleph.config.json은 단계 5와 실제 메모 API의 allowedRoutes를 기록합
 `xdr/privilege/read-alerts.mjs`는 5개 필드만 비밀값을 제거해 표시합니다. `xdr/privilege/respond.mjs`는 신뢰할 수 있는 수집기에서 검증한 계정과 원본 경보 계정이 일치하고 `block`이 재검증된 경우에만 15분짜리 임시 거부 규칙을 기록합니다. 근거 경보 ID를 보존하고 `xdr/alerts.log`에는 계정·주소·명령 원문 없이 최소 알림만 추가합니다. 엔진 검증 계정 리졸버와 등록된 거부 응답 생성자를 사용하는 어댑터를 제공합니다. **실제 로그인 토큰·세션 무효화는 제공 엔진이 집행해야 하며 로컬 규칙만으로 완료됐다고 주장하지 않습니다.** 기존 ZTNA 판정기 및 1~12단계와 다른 XDR 모듈은 변경하지 않습니다.
 
 재실행: `npm run xdr:run -- privilege`, `node --test test/privilege.test.mjs`. `xdr/privilege/result.json`은 수업용 모의 경보 결과이며 운영 집행의 증거가 아닙니다.
+
+
+## 보너스 XDR-06 · 자료 반출 목적지 탐지 (2026-10-16)
+
+`xdr/exfiltration/decide.mjs`는 MITRE ATT&CK T1041·T1048을 근거로 대용량 전송과 처음 보는 외부 목적지, 업무 시간 밖 압축 자료 반출, 반복 대량 전송, 비표준 포트, 자료실 전체 복사 등의 **여러 실제 정황이 결합**된 경우만 `block`을 반환합니다. 불충분한 사건은 `alert`, 정상 조회·평범한 소량 동기화는 `record`로 처리합니다. 단독 MITRE 태그·전송량만으로 차단하지 않습니다. `decide.mjs`는 심판 격리 환경에서 import·파일 접근 없이 동작합니다.
+
+`xdr/exfiltration/read-alerts.mjs`는 Wazuh 연습 경보 다섯 필드만 비밀값을 가려 읽습니다. `xdr/exfiltration/respond.mjs`는 인증된 수집기와 네트워크 증거로 검증한 목적지의 15분 만료 거부 규칙과 근거 경보 번호를 관리하고 `xdr/alerts.log`에는 최소 알림만 남깁니다. 기존 ZTNA 규칙은 수정하지 않습니다. 운영 엔진이 제공하는 목적지 검증과 현재 의심 전송 확인, 등록된 거부 응답 공급자가 있을 때만 추가 거부를 수행합니다. 일반 사용자·정상 전송은 별도 검증 없이는 막지 않습니다. **이 테스트는 실제 운영망 차단 증거가 아닙니다.**
+
+재실행: `npm run xdr:run -- exfiltration` 및 `node --test test/exfiltration.test.mjs`. 결과는 `xdr/exfiltration/result.json`에 기록됩니다.
