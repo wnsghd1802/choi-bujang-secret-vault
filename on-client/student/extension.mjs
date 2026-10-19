@@ -54,8 +54,8 @@ export function createStudentView() {
       if (account) {
         const { user, device, session } = me.data;
         addText(account, 'p', `사용자: ${user.label} (ID: ${user.id})`);
-        addText(account, 'p', `현재 기기: ${device.label} (ID: ${device.id}) · 보안 상태: ${deviceStates[device.status] || deviceStates.unknown}`);
-        addText(account, 'p', `현재 세션: ${session.id} · 세션 상태: ${sessionStates[session.status] || sessionStates.unknown}`);
+        addText(account, 'p', `현재 기기: ${device.label} (ID: ${device.id}) · 보안 상태: ${deviceStates[device.status] || deviceStates.unknown}(${device.status})`);
+        addText(account, 'p', `현재 세션: ${session.id} · 세션 상태: ${sessionStates[session.status] || sessionStates.unknown}(${session.status})`);
       }
 
       const deviceSection = addSection('내 기기 목록', devices);
@@ -65,7 +65,7 @@ export function createStudentView() {
           const list = document.createElement('ul');
           deviceSection.appendChild(list);
           for (const device of devices.data) {
-            addText(list, 'li', `${device.label} (ID: ${device.id}) · 보안 상태: ${deviceStates[device.status] || deviceStates.unknown}`);
+            addText(list, 'li', `${device.label} (ID: ${device.id}) · 보안 상태: ${deviceStates[device.status] || deviceStates.unknown}(${device.status})`);
           }
         }
       }
@@ -77,7 +77,7 @@ export function createStudentView() {
           const list = document.createElement('ul');
           sessionSection.appendChild(list);
           for (const session of sessions.data) {
-            addText(list, 'li', `세션 ID: ${session.id} · 세션 상태: ${sessionStates[session.status] || sessionStates.unknown}`);
+            addText(list, 'li', `세션 ID: ${session.id} · 세션 상태: ${sessionStates[session.status] || sessionStates.unknown}(${session.status})`);
           }
         }
       }
