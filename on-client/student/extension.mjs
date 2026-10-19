@@ -83,7 +83,66 @@ export function createStudentView() {
       }
       return root;
     },
-    renderDecision() { return '학생 구현 대기: 서버의 판정과 이유를 연결하세요.'; },
+    renderDecision({ status, mode, data, error, appId }) {
+      const root = document.createElement('div');
+      const addText = (value) => {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = value;
+        root.appendChild(paragraph);
+      };
+      const modes = {
+        demo: '예제 자료 · 실제 연결 판정이 아닙니다.',
+        disconnected: '연결 없음',
+        unknown: '연결 상태 확인 불가',
+      };
+      if (Object.hasOwn(modes, mode)) addText(`데이터 상태: ${modes[mode]}`);
+
+      if (status === 'idle') {
+        addText('업무 앱 하나를 선택하고 접속 요청 버튼을 누르세요.');
+        return root;
+      }
+
+      if (appId) addText(`요청한 업무 앱 ID: ${appId}`);
+
+      if (status === 'loading') {
+        addText('접속 판정 확인 중');
+        return root;
+      }
+
+      if (status === 'error') {
+        const message = typeof error?.message === 'string' && error.message
+          ? error.message : '오류 내용을 확인할 수 없습니다.';
+        const unverified = error?.code === 'CONTRACT_MISMATCH' || error?.code === 'ENGINE_RESULT_UNVERIFIED';
+        addText(`${unverified ? '판정 확인 불가' : '접속 판정 요청 실패'}: ${message}`);
+        addText('요청 실패 또는 확인 불가는 접근 거부(deny) 판정도, 접근 허용(allow) 판정도 아닙니다.');
+        return root;
+      }
+
+      if (status !== 'ok' || !data) {
+        addText('판정 확인 불가(unknown) · 접근 허용으로 간주하지 않습니다.');
+        return root;
+      }
+
+      const labels = {
+        allow: '접근 허용',
+        deny: '접근 거부',
+        challenge: '추가 확인 필요',
+        unknown: '판정 확인 불가',
+      };
+      const decision = Object.hasOwn(labels, data.decision) ? data.decision : 'unknown';
+      addText(`업무 앱 ID: ${data.appId}`);
+      addText(`접속 판정: ${labels[decision]}(${decision})`);
+      if (decision === 'allow') {
+        addText('정책상 접근 허용이며 실제 업무 앱 접속 성공을 보장하지 않습니다.');
+      } else if (decision === 'challenge') {
+        addText('추가 인증 또는 확인이 필요합니다. 이 앱은 확인 절차를 대신 수행하지 않습니다.');
+      } else if (decision === 'unknown') {
+        addText('판정 결과를 확인할 수 없습니다. 접근 허용으로 간주하지 않습니다.');
+      }
+      addText(`판정 이유: ${typeof data.reason === 'string' && data.reason ? data.reason : '사유 정보 없음'}`);
+      addText(`판정 시각: ${typeof data.checkedAt === 'string' && data.checkedAt ? data.checkedAt : '확인 불가'}`);
+      return root;
+    },
     renderEvents() { return '학생 구현 대기: 본인 접속·XDR 기록을 연결하세요.'; },
     renderStatus() { return '학생 구현 대기: 기기·세션·알림과 연결 점검 상태를 구분하세요.'; },
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
