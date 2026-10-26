@@ -540,7 +540,10 @@ export function createStudentView() {
         return root;
       };
     
-      // An error can arrive after the selected event has been cleared.
+      if (!event) {
+        addText('p', '보안 기록에서 설명할 기록을 먼저 선택하세요.');
+        return root;
+      }
       if (explanation?.status === 'error') {
         const code = safeCodes.includes(explanation.error?.code)
           ? explanation.error.code : 'AI_REQUEST_UNVERIFIED';
@@ -557,10 +560,6 @@ export function createStudentView() {
         return root;
       }
     
-      if (!event) {
-        addText('p', '보안 기록에서 설명할 기록을 먼저 선택하세요.');
-        return root;
-      }
       if (!explanation || explanation.status === 'idle') {
         addText('p', 'AI 사건 설명 요청 전입니다. AI 연결 점검만으로 사건 설명이 생성되지는 않습니다.');
         return root;
