@@ -256,7 +256,7 @@ function createNativeManager(raw,host){
       const result=await connector.begin({signal:controller.signal});assertNativeHostOperation(host,cap);
       if(!result?.ok||!result.connection||!isWorkbenchApprovalUrl(result.connection.approvalUrl,result.connection.deviceId,context.projectId))throw Error('ALEKOV_CONNECT_OUTCOME_UNKNOWN');
       flow={id:result.connection.deviceId,expiresAt:result.connection.expiresAt,state:'awaiting_approval',reason:null,cap,controller,connector,handle:result.handle,vaultAck:false,timer:null};flows.set(flow.id,flow);
-      flow.timer=setTimeout(()=>settle(flow,'unknown','ALEKOV_CONNECT_TIMEOUT'),finishTimeoutMs);return reply(201,{ok:true,data:{...view(flow),approvalUrl:result.connection.approvalUrl,confirmation:result.connection.confirmation}});
+      flow.timer=setTimeout(()=>settle(flow,'unknown','ALEKOV_CONNECT_TIMEOUT'),finishTimeoutMs);return reply(201,{ok:true,data:{connectionId:flow.id,approvalUrl:result.connection.approvalUrl,confirmation:result.connection.confirmation,expiresAt:flow.expiresAt,state:flow.state}});
     }catch{controller.abort();closeNativeHostOperation(cap);return failure(409,'ALEKOV_CONNECT_CONTEXT_UNVERIFIED');}
     finally{clearTimeout(timer);signal?.removeEventListener('abort',stop);starting--;}
   }
