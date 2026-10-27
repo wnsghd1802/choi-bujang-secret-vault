@@ -217,6 +217,23 @@ flowchart LR
 
 상세 오류 계약은 [CONNECTION_TROUBLESHOOT.md](CONNECTION_TROUBLESHOOT.md), 실행기 동작은 [STUDENT_LAUNCH_GUIDE.md](STUDENT_LAUNCH_GUIDE.md), 앱 AI 승인 방법은 [AI_SETUP_GUIDE.md](AI_SETUP_GUIDE.md)와 대조합니다. 제공 문서에 현재 `package.json`과 다른 오래된 예시가 있을 수 있으므로 **실제 저장소의 파일과 실행 스크립트를 우선**합니다.
 
+### 7-1. 권장 제작 기간 점검: 실제 연결과 학생 화면 구분 (KimJH)
+
+다음 표는 **2026-10-27 기존 PC 화면 관찰**과 **현재 GitHub 원문 확인**에 한정됩니다. 코드·설명서가 존재한다는 것만으로 실서비스 연결이 성공했다고 기록하지 않습니다.
+
+| 핵심 기능 | 학생 화면에서 실제 본 것 | 현재 코드의 연결 경계와 다음 확인 |
+| --- | --- | --- |
+| 로그인·기기·업무 앱 접근 | 기존 PC 화면에서 §renderIdentity§ 오류 표시, §renderDecision§의 판정 요청 전 상태, 제공 UI의 기존 서버 연결 실패를 관찰함. **실제 허용·거부 판정은 미확인** | §src/server.mjs§는 §-SdpHostConfig§가 없는 기본 모드에서 SDP 연결이 되지 않습니다. §student/engine-adapter.mjs§는 검증된 호스트 capability만 전달하므로 임의 데이터를 만들지 않습니다. 운영자가 승인한 SDP 원천, 사용자 범위, 개인 자격 설정이 있어야 합니다 |
+| 본인 접속·XDR 기록 | §renderEvents§의 「연결 없음」·기록 조회 실패를 확인함. 실제 사건·필터·근거 상세의 새 실측은 없음 | §src/engine/sdp-host.mjs§에는 §readEvents§·§readDevices§·§readSessions§ 구현이 있으나 **원천 연결 성공 및 실제 XDR 데이터는 미확인**. 제공 API가 실데이터를 반환할 때만 목록·필터·상세를 평가합니다 |
+| 정확한 설치 버전·OSV | 기존 PC 화면에서 **§PROJECT_NOT_CONFIGURED§**, §not_configured§, 조회 시각 §2026-10-27T07:20:16.207Z§(한국시간 16:20:16)를 관찰함. OSV로 전송한 패키지나 취약점 ID는 없음 | §src/vulnerabilities/project-scan.mjs§는 운영자 승인 §ON_PROJECT_DIRECTORY§와 §ON_APPROVED_PUBLIC_PACKAGES§ 및 해당 프로젝트의 §package-lock.json§·설치 메타데이터를 검사합니다. §on-client§ 내부에 lockfile이 없고 지정된 프로젝트가 없는 현재 상태에서 ‘취약점 없음’을 주장할 수 없습니다 |
+
+**설정 경계:** §-NativeHostConfig§는 ALEPH 계정/AI 연결 설정이고 §-SdpHostConfig§는 별도의 기존 SDP 엔진 설정입니다. 전자를 사용했다고 후자의 연결이 완료되는 것은 아닙니다. 비밀 키·인증서·토큰·개인 설정 파일은 프로젝트와 Git 밖에서 운영자가 관리하며, 이 설명서에는 어떤 비밀값도 적지 않습니다. 학생 표시 코드는 API 상태를 출력할 뿐 운영자의 승인 목록을 추가하거나 권한 검사를 우회하지 않습니다.
+
+**이번 UI 개선 범위:** §student/extension.mjs§의 §renderIdentity§·§renderDecision§·§renderEvents§·§renderVulnerabilities§에서 미연결/미설정 원인과 수동 확인 동선을 더 분명히 표시합니다. 제공 서버·§public/app.js§·§student/engine-adapter.mjs§·판정·인증 설정은 변경하지 않았습니다. 기존 §allow§/§deny§/§challenge§/§unknown§, §not_configured§·§not_checked§·§unverifiable§ 등 상태 코드의 의미도 변경하지 않았습니다.
+
+**실행 결과와 설명용 값 구분:** §2026-10-27T07:20:16.207Z§는 위 사용자 화면에서 실제 관찰한 값이며 **현재 앱을 재실행해 측정한 새 값은 아닙니다.** §allow§·§deny§·§challenge§ 및 §known_vulnerabilities§는 코드가 처리하는 **가능한 상태값의 예**이며 현재 실제 조회 결과가 아닙니다. 개선된 새 문구와 로컬 문법 검사의 결과도 학생 PC에서 새로 실행해 확인하기 전까지 **미확인**입니다.
+
+
 ## 8. 직접 재현할 확인 순서 (문서 작성 이후)
 
 1. **새 PowerShell 창**에서 3장의 경로 확인 명령을 실행하고 `on-client`로 이동합니다. 기존 파일·실행 중 서버를 보존합니다.

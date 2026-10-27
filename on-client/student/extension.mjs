@@ -40,7 +40,15 @@ export function createStudentView() {
         if (resource.status === 'error') {
           const message = resource.error && typeof resource.error.message === 'string' && resource.error.message
             ? resource.error.message : '오류 내용을 확인할 수 없습니다.';
+          const code = typeof resource.error?.code === 'string'
+            && /^[A-Z][A-Z0-9_]{0,63}$/.test(resource.error.code) ? resource.error.code : null;
           addText(section, 'p', `연결 실패: ${message}`);
+          if (code) addText(section, 'p', `오류 코드: ${code}`);
+          if (resource.mode === 'disconnected' || code === 'ENGINE_NOT_CONNECTED') {
+            addText(section, 'p', '기존 SDP 엔진이 연결되지 않았습니다. 운영자가 승인한 -SdpHostConfig 연결 여부를 확인하세요. AI 계정용 -NativeHostConfig는 SDP 연결을 대신하지 않습니다.');
+          } else {
+            addText(section, 'p', '실제 사용자·기기·세션을 확인하지 못했습니다. 연결 상태를 확인한 뒤 「다시 불러오기」로 직접 재조회하세요.');
+          }
           return null;
         }
         if (resource.status !== 'ok' || !resource.data) {
@@ -98,7 +106,12 @@ export function createStudentView() {
       if (Object.hasOwn(modes, mode)) addText(`데이터 상태: ${modes[mode]}`);
 
       if (status === 'idle') {
-        addText('업무 앱 하나를 선택하고 접속 요청 버튼을 누르세요.');
+        if (mode === 'disconnected') {
+          addText('기존 SDP 엔진 연결이 없어 업무 앱 목록과 접근 판정을 확인할 수 없습니다. 앱 선택·판정 요청은 실행되지 않았습니다.');
+          addText('운영자에게 SDP 연결 상태를 확인한 뒤 제공 화면의 「다시 불러오기」를 직접 누르세요.');
+        } else {
+          addText('업무 앱 하나를 선택하고 접속 요청 버튼을 누르세요.');
+        }
         return root;
       }
 
@@ -114,7 +127,13 @@ export function createStudentView() {
           ? error.message : '오류 내용을 확인할 수 없습니다.';
         const unverified = error?.code === 'CONTRACT_MISMATCH' || error?.code === 'ENGINE_RESULT_UNVERIFIED';
         addText(`${unverified ? '판정 확인 불가' : '접속 판정 요청 실패'}: ${message}`);
+        if (typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)) {
+          addText(`오류 코드: ${error.code}`);
+        }
         addText('요청 실패 또는 확인 불가는 접근 거부(deny) 판정도, 접근 허용(allow) 판정도 아닙니다.');
+        addText(mode === 'disconnected' || error?.code === 'ENGINE_NOT_CONNECTED'
+          ? '기존 SDP 연결이 준비되지 않았습니다. 운영자 연결 상태를 확인하세요. 임의 판정을 만들지 않습니다.'
+          : '실제 판정이 확인되지 않았습니다. 제공 화면의 「다시 불러오기」로 앱 목록을 확인한 뒤 직접 다시 요청하세요.');
         return root;
       }
 
@@ -167,6 +186,12 @@ export function createStudentView() {
           ? error.message : '오류 내용을 확인할 수 없습니다.';
         const unverified = error?.code === 'CONTRACT_MISMATCH' || error?.code === 'ENGINE_RESULT_UNVERIFIED';
         addText(root, 'p', `${unverified ? '확인 불가 · ' : ''}기록을 불러오지 못했습니다: ${message}`);
+        if (typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)) {
+          addText(root, 'p', `오류 코드: ${error.code}`);
+        }
+        addText(root, 'p', mode === 'disconnected' || error?.code === 'ENGINE_NOT_CONNECTED'
+          ? '기존 SDP·XDR 기록 원천이 연결되지 않았습니다. 운영자가 승인한 -SdpHostConfig를 확인하세요. 조회 실패는 기록 0건이 아닙니다.'
+          : '기록을 확인하지 못했습니다. 제공 화면의 「다시 불러오기」로 직접 재조회하세요. 자동 재시도하거나 빈 성공으로 표시하지 않습니다.');
         return root;
       }
       if (status !== 'ok' || !Array.isArray(data)) {
@@ -481,6 +506,13 @@ export function createStudentView() {
       }
       const summary = addText(root, 'p', `전체 조회 상태: ${scanStates[data.status]} (${data.status})`);
       summary.setAttribute('role', 'status');
+      if (data.status === 'not_configured') {
+        addText(root, 'p', '점검 대상 설정이 없습니다. 서버 운영자가 ON_PROJECT_DIRECTORY에 승인된 실제 프로젝트 경로를 지정해야 합니다. 학생 화면에서 대상이나 인증 정보를 임의로 입력하지 않습니다.');
+      } else if (data.status === 'not_checked') {
+        addText(root, 'p', '승인된 공개 패키지 조회 대상이 없습니다. 운영자가 ON_APPROVED_PUBLIC_PACKAGES 승인 목록과 설치 메타데이터를 확인해야 하며, 취약점 없음으로 판단하지 않습니다.');
+      } else if (data.status === 'unverifiable') {
+        addText(root, 'p', '대상 프로젝트의 package-lock.json과 설치된 패키지 메타데이터를 검증할 수 없습니다. 파일을 임의 변경하거나 확인 불가를 안전으로 표시하지 않습니다.');
+      }
       if (data.lockfileVersion !== undefined && data.lockfileVersion !== null) {
         addText(root, 'p', `lockfileVersion (package-lock.json 형식 버전): ${data.lockfileVersion}`);
       }
