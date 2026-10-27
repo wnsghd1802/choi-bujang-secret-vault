@@ -25,3 +25,17 @@ npm start도 같은 서버를 켭니다. 기본 실행은 실제 회사 시스�
 - 오류 코드별 해결: docs/CONNECTION_TROUBLESHOOT.md
 - 시작 틀 업데이트(내 파일 보존): docs/STARTER_UPDATE.md
 - 실제 회사 시스템(SDP)·앱 안 AI 연결은 담당자가 따로 안내할 때만 씁니다: docs/SDP_HOST_CONNECTION.md, docs/AI_SETUP_GUIDE.md. 이 연결은 앱을 처음 켜고 13~16단계 화면을 만들거나 공식 AI 코드 판정을 받기 위한 전제 조건은 아닙니다. 다만 17단계 이후의 실제 연결과 새 환경 재현은 해당 단계의 기준에 따라 따로 확인합니다.
+
+## KimJH 학생 설명서 (21단계 작성)
+
+**목적:** KimJH는 사용자 본인의 로그인·기기·세션, 업무 앱 접근 판정, XDR 기록, AI 설명·조치 제안 및 OSV 설치 패키지 조회 상태를 보여 주는 보안 Agent입니다. 실제 접근 판정·탐지·집행은 기존 SDP/원천 시스템의 영역이고 학생 화면이 이를 직접 실행하지 않습니다.
+
+**실행 환경:** Windows PowerShell에서 확인된 Node.js `v24.19.0`, 앱 버전 `0.2.11`. Git 최상위는 `choi-bujang-secret-vault`이고 이 앱의 실행 폴더는 `on-client`입니다. `on-client/package.json`에 외부 npm 의존성은 없고, 이 하위 폴더에는 `package-lock.json`이 없습니다. 최상위 프로젝트의 패키지 파일과 혼동하지 않습니다. Windows 세부 버전, 다른 OS·브라우저에서의 재현은 미확인입니다.
+
+**시작과 종료:** `on-client`에서 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1`을 실행해 로컬 `http://127.0.0.1:5189/`에 접속합니다. 서버가 응답했다는 출력은 실제 SDP·AI 연결 성공을 증명하지 않습니다. 중지는 실행 창의 `Ctrl+C`이며, 재실행은 같은 명령입니다. 본인 PC에서 이미 준비된 Native Host를 사용하는 실제 명령·확인 순서는 아래 학생 문서에 있습니다.
+
+**기능 구성:** 브라우저 ↔ `public/app.js` ↔ `src/server.mjs` ↔ 기존 엔진 어댑터·AI 연결/CLCO 게이트·OSV 스캐너. 학생 기능은 `student/extension.mjs`의 `renderIdentity`, `renderDecision`, `renderEvents`, `renderStatus`, `renderAiConnection`, `renderExplanation`, `renderAction`, `renderVulnerabilities`에 있으며 제공 UI·서버·판정기와 분리됩니다.
+
+**확인한 범위:** 20단계까지의 학생 화면·문법 검사 및 `not_configured` 상태는 실제 PC에서 확인했습니다. 현재 AI 앱의 모델 응답·실제 SDP 집행·OSV 패키지별 조회는 확인되지 않았습니다. 미조회·실패는 취약점 없음이나 안전을 뜻하지 않습니다. 인증 설정·열쇠는 문서와 Git에 포함하지 않습니다.
+
+**실제 작업 경로, 설치/실행/검증 명령, 텍스트 구성도, 오류별 확인, 21단계 제출 방식:** [`docs/STUDENT_RUNBOOK.md`](docs/STUDENT_RUNBOOK.md).
