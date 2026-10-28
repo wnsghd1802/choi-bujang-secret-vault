@@ -42,11 +42,11 @@ function line(title,message){
 }
 function failPc(text) {
  for(const id of ['network','firewall','events']) card(id,`확인 불가 · ${text}`);
- details.replaceChildren(make('p',`PC 조회 확인 불가: ${text}`));
+ details.replaceChildren(make('p',`PC 조회 확인 불가: ${text} 다음 조치: 로컬 서버 실행과 Windows 조회 권한·서비스를 확인한 후 「다시 조회」를 누르세요. 관리자 권한 상승은 요구하지 않습니다.`));
 }
 
 function eventLine(key,kind){
- if(kind?.status!=='ok')return `${key}: 확인 불가 · ${reason(kind)}`;
+ if(kind?.status!=='ok')return `${key}: 확인 불가 · ${reason(kind)} 다음 조치: 이벤트 로그 서비스를 확인한 뒤 「다시 조회」를 누르세요. 0건으로 대체하지 않습니다.`;
  const mark=kind.limited?'최소 ':'';
  return `${key}: 최근 24시간 오류 ${mark}${kind.error}건 / 경고 ${mark}${kind.warning}건${kind.limited?' (조회 상한 5,000건 도달)':''}`;
 }
@@ -63,7 +63,7 @@ function paintPc(data) {
    netSection.append(list);
  }else{
    card('network',`확인 불가 · ${reason(net)}`,fmtTime(net.observedAt));
-   line('로컬 네트워크 구성',`확인 불가 · ${reason(net)}`);
+   line('로컬 네트워크 구성',`확인 불가 · ${reason(net)} 다음 조치: 네트워크 어댑터 상태를 확인하고 「다시 조회」를 누르세요.`);
  }
  if(fw.status==='ok'&&Array.isArray(fw.profiles)&&fw.profiles.length>0){
    const disabled=fw.profiles.filter(x=>!x.enabled);
@@ -74,7 +74,7 @@ function paintPc(data) {
    section.append(list);
  }else{
    card('firewall',`확인 불가 · ${reason(fw)}`,fmtTime(fw.observedAt));
-   line('Windows 방화벽 프로필',`확인 불가 · ${reason(fw)}`);
+   line('Windows 방화벽 프로필',`확인 불가 · ${reason(fw)} 다음 조치: 일반 사용자 권한의 읽기 가능 여부를 확인하고 「다시 조회」를 누르세요. 설정은 변경하지 않습니다.`);
  }
  const both=system.status==='ok'&&application.status==='ok';
  if(both) {
@@ -82,7 +82,8 @@ function paintPc(data) {
    const capped=system.limited||application.limited;
    card('events',`24시간 오류 ${capped?'최소 ':''}${totalErrors}건 · 경고 ${capped?'최소 ':''}${totalWarnings}건${capped?' (상한 도달)':''}`,fmtTime(system.observedAt));
  }else{
-   card('events','일부 또는 전체 확인 불가',system.status==='ok'?fmtTime(system.observedAt):application.status==='ok'?fmtTime(application.observedAt):'확인 불가');
+   const missing=['System','Application'].filter(name=>(name==='System'?system:application).status!=='ok');
+   card('events',`확인 불가 · ${missing.join('·')} 기록 조회 실패`,system.status==='ok'?fmtTime(system.observedAt):application.status==='ok'?fmtTime(application.observedAt):'확인 불가');
  }
  const logSection=line('최근 Windows 기록 (System · Application)','지난 24시간의 Warning(Level 3)·Error(Level 2) 이벤트 건수입니다. 침해·공격·악성코드 탐지 결과가 아닙니다.');
  logSection.append(make('p',eventLine('System',system)));
@@ -121,13 +122,20 @@ async function readSdp(signal){
    }else if(mode==='connected'&&code==='ADAPTER_CONFIGURED'){
      card('sdp','SDP 어댑터 구성됨 · 실데이터 조회 성공은 미확인',at);
    }else card('sdp','SDP 확인 불가 · 연결 상태 검증 필요',at);
- }catch{card('sdp','SDP 확인 불가 · 진단 API 읽기 실패');}
+ }catch{card('sdp','SDP 확인 불가 · 진단 API 읽기 실패. 다음 조치: 로컬 서버를 확인한 뒤 「다시 조회」를 누르세요.');}
 }
 if(measure&&state&&details&&historyBody&&ids.every(id=>byId(`windows-${id}-summary`)&&byId(`windows-${id}-time`))){
+ // 네이티브 버튼을 유지해 Tab·Enter·Space 입력을 지원한다.
+ const readyLabel = '다시 조회 · 관제 상태';
+ measure.textContent = readyLabel;
  measure.addEventListener('click',async()=>{
    if(running)return;
    running=true;measure.disabled=true;
-   state.textContent='PC 상태와 SDP 상태를 각각 조회 중입니다. 자동으로 반복 조회하지 않습니다.';
+   measure.textContent='조회 중…';
+   state.setAttribute('aria-busy','true');
+   state.textContent='로컬 네트워크·방화벽·Windows 기록과 SDP를 각각 조회 중입니다. 이전 값은 현재 조회 결과가 아닙니다.';
+   for(const id of ids)card(id,'조회 중 · 새 결과 대기','확인 중');
+   details.replaceChildren(make('p','조회 중 · 새로운 Windows 조회 결과를 기다리고 있습니다. 과거 조회 이력은 아래 표에 별도로 남습니다.'));
    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),14500);
    try{
      // 두 원천은 독립 상태: Windows 조회가 성공해도 SDP 연결 성공으로 계산하지 않는다.
@@ -138,8 +146,14 @@ if(measure&&state&&details&&historyBody&&ids.every(id=>byId(`windows-${id}-summa
      if(pcResult.status==='fulfilled'){
        try{paintPc(pcResult.value.data);}catch{failPc('서버 측정 데이터 형식이 일치하지 않습니다.');}
      }else failPc('로컬 조회 API가 응답하지 않았습니다. 권한·서비스·서버 상태를 확인하세요.');
-     if(sdpResult.status==='rejected')card('sdp','SDP 확인 불가 · 진단 실행 실패');
-     state.textContent='조회 완료 · 성공 항목만 실측으로 표시합니다. Windows 기록 건수는 침해·공격 탐지가 아닙니다.';
-   }finally{clearTimeout(timeout);running=false;measure.disabled=false;}
+     if(sdpResult.status==='rejected')card('sdp','SDP 확인 불가 · 진단 실행 실패. 다음 조치: 로컬 서버 연결을 확인한 뒤 「다시 조회」를 누르세요.');
+     state.textContent=pcResult.status==='fulfilled'
+       ? '조회 종료 · 정상 응답 항목만 실측으로 표시합니다. 확인 불가 항목은 각각 이유와 다음 조치를 확인하세요. Windows 기록 건수는 침해·공격 탐지가 아닙니다.'
+       : 'PC 조회 실패 · 네트워크·방화벽·기록의 현재 값을 확인할 수 없습니다. 로컬 서버를 확인한 뒤 「다시 조회」를 누르세요. SDP 상태는 별도입니다.';
+   }finally{
+     clearTimeout(timeout);
+     running=false;measure.disabled=false;measure.textContent=readyLabel;
+     state.setAttribute('aria-busy','false');
+   }
  });
 }

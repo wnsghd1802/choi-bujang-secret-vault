@@ -26,6 +26,23 @@ export function createStudentView() {
         parent.appendChild(element);
         return element;
       };
+      // 총공세 4일차: 학생 슬롯의 맨 앞에서 핵심 기능을 먼저 찾을 수 있게 안내한다.
+      // 다른 탭의 실제 조회 성공이나 설치형 앱의 전체 화면 반영을 주장하지 않는다.
+      const overview = document.createElement('section');
+      overview.setAttribute('aria-label', 'KimJH 핵심 기능 3가지');
+      addText(overview, 'h3', 'KimJH 핵심 기능 3가지');
+      const priorities = document.createElement('ol');
+      const identityState = me?.status === 'loading' ? '불러오는 중'
+        : me?.status === 'ok' && me?.mode === 'connected' ? 'SDP 응답 확인'
+        : me?.mode === 'demo' ? '예제(demo) · 실제 SDP 아님'
+        : me?.mode === 'disconnected' || me?.error?.code === 'ENGINE_NOT_CONNECTED'
+          ? 'SDP 미연결 · 확인 불가' : '확인 불가';
+      addText(priorities, 'li', `보호 현황 · 로그인·기기·세션: ${identityState}`);
+      addText(priorities, 'li', '업무 앱 · 접근 판정: 왼쪽 「업무 앱」에서 별도 확인');
+      addText(priorities, 'li', '보안 기록 · 접속·XDR: 왼쪽 「보안 기록」에서 별도 확인');
+      overview.appendChild(priorities);
+      addText(overview, 'p', '각 기능의 실제 조회 결과는 해당 영역에서 확인합니다. SDP 미연결과 예제 데이터는 성공으로 처리하지 않습니다.');
+      root.appendChild(overview);
       const addSection = (title, resource) => {
         const section = document.createElement('section');
         root.appendChild(section);
@@ -103,6 +120,7 @@ export function createStudentView() {
         disconnected: '연결 없음',
         unknown: '연결 상태 확인 불가',
       };
+      addText('핵심 기능 2/3 · 업무 앱 접근 판정: 결과가 확인될 때만 허용·차단·추가 확인·확인 불가를 구분합니다.');
       if (Object.hasOwn(modes, mode)) addText(`데이터 상태: ${modes[mode]}`);
 
       if (status === 'idle') {
@@ -175,6 +193,8 @@ export function createStudentView() {
         disconnected: '연결 없음',
         unknown: '연결 상태 확인 불가',
       };
+      addText(root, 'h3', '핵심 기능 3/3 · 보안 기록·XDR');
+      addText(root, 'p', 'SDP 원천의 접속·XDR 기록만 표시합니다. Windows System·Application 경고 건수는 공격 탐지 결과가 아닙니다.');
       if (Object.hasOwn(modeLabels, mode)) addText(root, 'p', `데이터 상태: ${modeLabels[mode]}`);
 
       if (status === 'loading') {

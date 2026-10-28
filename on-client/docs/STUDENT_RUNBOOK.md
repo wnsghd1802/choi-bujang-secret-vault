@@ -326,3 +326,38 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 브라우저 `http://127.0.0.1:5189/`에서 강력 새로고침 → 「보호 현황」 맨 위 「KimJH 관제 대시보드」 → 「지금 상태 조회」를 누릅니다. 카드 4개와 각 조회 시각, 네트워크·방화벽·Windows 집계, SDP가 서로 구분돼 보이는지 확인합니다. 버튼을 다시 눌러 아래 이력 표에 조회별 결과가 추가되는지 확인합니다. 사용자가 PC의 민감 정보가 보이는 전체 캡처를 공유할 필요는 없습니다.
 
 **재현 증거 수준:** GitHub 원문과 Node.js 모의 데이터를 사용한 계약 검사는 실제 Windows PC 정보 조회가 아닙니다. 사용자가 데스크톱에서 직접 클릭하기 전에는 실제 네트워크 주소, 방화벽 설정, 이벤트 건수, 현재 SDP 연결 상태가 **모두 미확인**입니다. 이후 사용자가 공유한 확인 결과만 측정값으로 기록합니다. 기존 22단계 제출 SHA는 보존하며 별도 새 소스 커밋은 과거 제출을 소급 변경하지 않습니다.
+
+
+## 12. 총공세 4일차 — 학생 표시 영역과 관제 대시보드 조회 사용성
+
+**실행·포장 범위:** 기존 프로젝트 `on-client`에서 실행합니다. 4일차에 **설치형 앱 제작·포장·`npm start` 실행은 하지 않습니다.** 설치형 앱에 반영되는 범위는 패키징 계약으로 별도 검증하지 않았습니다. `public/index.html`과 `public/app.js`를 바꾸어 설치형에도 반영된다고 가정하지 않습니다.
+
+### 기존 계약과 수정 범위
+
+- 현재 커밋에서 `student/extension.mjs`의 `createStudentView()`와 `renderIdentity`, `renderDecision`, `renderEvents` 등 기존 학생 표시 함수가 존재합니다. `student/appearance.json`은 **없으며** 적용 로더도 확인되지 않아 만들지 않았습니다.
+- 학생 영역의 `renderIdentity`에 **핵심 기능 3가지(보호 현황·업무 앱 접근 판정·보안 기록/XDR)**를 먼저 찾을 수 있도록 설명합니다. 각 메뉴는 기존 제공 UI가 관리하며, 학생 함수가 전역 메뉴 순서나 설치형 전체 레이아웃을 바꾸지는 않습니다.
+- `renderDecision`과 `renderEvents`는 해당 기능의 핵심 상태·조회 한계를 먼저 표시하도록 보강합니다. 기존 데이터 계약·필터·상세·`data-student-*`·AI·보안 조치 기능은 보존합니다.
+- 브라우저 전용 학생 추가 화면인 `public/pc-status.mjs` 및 `public/windows-dashboard.mjs`는 **기존 HTML의 키보드 사용 가능한 button과 status 영역**을 재사용합니다. 버튼 이름은 「다시 조회 · CPU·메모리·디스크」와 「다시 조회 · 관제 상태」이며, 실행 중에는 「조회 중…」으로 표시하고 중복 클릭을 막습니다. 각각의 상태 영역에 `aria-busy`와 기존 `aria-live="polite"`가 적용됩니다.
+- 조회 시작 시 **이전 값은 현재 값이 아니다**는 안내와 대기 표시를 갱신합니다. 정상 조회의 수치·시간은 원본 API의 실측값만 표시합니다. 부분 실패는 항목별 `확인 불가`·이유·다음 행동을 표시합니다. 전체 API 실패 시에는 현재 측정값을 예제 숫자나 이전 값으로 대체하지 않습니다. Windows 이력 표의 지난 조회값은 **조회 시각이 표시된 기록**으로만 유지하고 현재 상태 카드에는 재사용하지 않습니다.
+- 네트워크·방화벽·이벤트 로그는 여전히 **읽기 전용**, SDP는 Windows PC 정보와 **별도 조회**입니다. Windows System·Application 경고·오류 건수는 **공격·침해 탐지가 아닙니다**.
+
+### 데스크톱 재현 (실제 폴더, 일반 사용자 권한)
+
+기존 서버가 동작 중이면 해당 PowerShell 창에서 `Ctrl+C`로 종료한 뒤, 데스크톱 프로젝트의 `on-client` 폴더에서 아래를 실행합니다.
+
+```powershell
+Set-Location -LiteralPath "C:\Users\Administrator\Desktop\SKTA-KJH\choi-bujang-secret-vault\on-client"
+git pull --ff-only origin main
+npm.cmd run check
+node --check .\public\pc-status.mjs
+node --check .\public\windows-dashboard.mjs
+node --check .\src\server.mjs
+node --test .\test\windows-observation.test.mjs
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+```
+
+이 PC에 이미 개인 Native Host 설정을 구성해 둔 경우에만 이전과 같이 명시적 `-NativeHostConfig` 옵션을 사용할 수 있습니다. 인증 파일을 새로 만들거나 다른 PC에서 복사하지 않습니다.
+
+브라우저 `http://127.0.0.1:5189/`에서 `Ctrl+F5`로 강력 새로고침한 뒤 「보호 현황」의 관제 카드 4개와 학생 핵심 3가지 안내를 확인합니다. `Tab`으로 두 조회 버튼에 이동하고 `Enter` 또는 `Space`로 조작합니다. 조회 중에는 대기 문구와 버튼 비활성 상태가 나타나며, 종료 후 버튼이 「다시 조회」로 복원됩니다. SDP 미연결은 PC 조회 성공과 관계없이 분리 표시합니다. 「업무 앱」·「보안 기록」 학생 영역에서 핵심 기능 안내와 오류·재조회 방법을 확인합니다. 설치형 앱의 실제 동작은 **미검증**입니다.
+
+**실측값과 예시값의 경계:** 이전에 사용자 브라우저에서 확인한 2·3일차 값은 당시 사용자의 PC 실측 화면이라는 사실만 인정합니다. 재조회 후 현재값은 새 `measuredAt`/`observedAt`에 근거하며 새로운 실측 전에는 `조회 전`/`조회 중`/`확인 불가`로 표시합니다. 4일차 변경 사항의 Windows PC 재실행·키보드 점검은 사용자가 직접 실행할 때까지 **미확인**입니다. 모의 테스트 수치는 사용자 PC 결과가 아닙니다.

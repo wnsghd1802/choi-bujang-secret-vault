@@ -34,7 +34,7 @@ function fmtTime(date) {
 function showUnavailable(key, reason, date = null) {
   metricNode(key, 'value').textContent = `확인 불가 — ${reason}`;
   metricNode(key, 'time').textContent = date ? `측정 시각: ${fmtTime(date)}` : '측정 시각: 확인 불가';
-  metricNode(key, 'compare').textContent = '직전 측정 비교: 확인 불가';
+  metricNode(key, 'compare').textContent = '직전 측정 비교: 확인 불가 · 다음 조치: 로컬 서버와 일반 사용자 조회 가능 여부를 확인한 뒤 「다시 조회」를 누르세요.';
 }
 function paint(data) {
   if (data?.schema !== 'kimjh.pc-status.v1' || data?.source !== 'local-node-os' ||
@@ -71,11 +71,21 @@ function paint(data) {
   previous = current;
 }
 if (button && message && keys.every(key => ['value', 'time', 'compare'].every(field => metricNode(key, field)))) {
+  // 기본 HTML의 버튼을 유지하므로 Tab·Enter·Space로 조작 가능하다.
+  const readyLabel = '다시 조회 · CPU·메모리·디스크';
+  button.textContent = readyLabel;
   button.addEventListener('click', async () => {
     if (running) return;
     running = true;
     button.disabled = true;
-    message.textContent = '로컬 PC 자원 측정 중 · 자동 재시도하지 않습니다.';
+    button.textContent = '조회 중…';
+    message.setAttribute('aria-busy', 'true');
+    message.textContent = 'CPU·메모리·디스크를 로컬 PC에서 다시 측정하는 중입니다. 직전 값은 현재 측정값이 아닙니다.';
+    for (const key of keys) {
+      metricNode(key, 'value').textContent = '조회 중 · 새 측정 결과 대기';
+      metricNode(key, 'time').textContent = '측정 시각: 조회 중';
+      metricNode(key, 'compare').textContent = '직전 측정 비교: 조회 결과 대기';
+    }
     const controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 8000);
     try {
@@ -88,11 +98,13 @@ if (button && message && keys.every(key => ['value', 'time', 'compare'].every(fi
     } catch {
       for (const key of keys) showUnavailable(key, '로컬 서버 측정 결과를 읽지 못했습니다. 연결 상태를 확인한 뒤 직접 다시 측정하세요.');
       previous = null;
-      message.textContent = '측정 실패 · 확인 불가. 이전 결과는 현재 측정값으로 표시하지 않습니다.';
+      message.textContent = '측정 실패 · CPU·메모리·디스크 확인 불가. 로컬 서버 실행 상태를 확인한 뒤 「다시 조회」를 누르세요. 이전·예제 수치는 표시하지 않습니다.';
     } finally {
       clearTimeout(deadline);
       running = false;
       button.disabled = false;
+      button.textContent = readyLabel;
+      message.setAttribute('aria-busy', 'false');
     }
   });
 }
