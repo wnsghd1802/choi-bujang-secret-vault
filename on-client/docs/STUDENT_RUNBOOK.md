@@ -2,6 +2,55 @@
 
 > **문서 범위:** 현재 저장소의 `on-client` 애플리케이션, 기존 13~20단계 학생 표시 기능, 2026-10-27까지 관찰한 로컬 동작. **21단계 공식 통과(2026-10-27 15:30 KST)**를 확인했습니다. 22단계 별도 폴더 실행·미확인 기능은 [STUDENT_RELEASE_RECORD.md](STUDENT_RELEASE_RECORD.md)에 구분해 기록합니다. 제공 문서와 서버 코드를 덮어쓰지 않았습니다.
 
+
+## 0. 총공세 5일차 — 처음 보는 사람의 실행 절차 (2026-10-28 갱신)
+
+**중요:** 프로젝트 폴더를 새로 만들거나 기존 코드·제출물·인증 파일을 지우지 않습니다. 설치 프로그램 제작·포장 명령·관리자 권한 상승은 하지 않습니다. 5일차에 **제3자가 실제로 겪은 오류 원문은 아직 전달되지 않아 미확인**입니다. 과거 데스크톱에서 확인된 `Set-Location` 경로 없음, `Missing script: "check"`, `src/server.mjs` 및 `tools/start-alekov.ps1` 찾기 실패는 **노트북 경로를 다른 PC에 복사하고 `on-client`가 아닌 폴더에서 실행한 안내/작업 위치 문제**입니다. 코드 오류라고 단정하지 않습니다.
+
+1. Windows 파일 탐색기에서 **기존 `choi-bujang-secret-vault` 폴더 또는 그 안의 `on-client`**를 엽니다. 주소창에 `powershell`을 입력하고 Enter를 눌러 해당 위치에서 PowerShell을 엽니다. 이전에 실행한 서버가 있다면 실행 중인 PowerShell에서 `Ctrl+C`로 종료합니다.
+2. 다른 PC의 절대 경로를 복사하지 말고 **실제 Git 폴더**를 찾아 앱 폴더로 이동한 뒤 구문을 검사합니다.
+
+```powershell
+$ProjectRoot = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $ProjectRoot) { throw "기존 Git 프로젝트 폴더에서 PowerShell을 열어 주세요." }
+$AppRoot = Join-Path $ProjectRoot "on-client"
+if (-not (Test-Path -LiteralPath (Join-Path $AppRoot "tools\start-alekov.ps1") -PathType Leaf)) { throw "on-client 실행 도구가 없습니다." }
+if (-not (Test-Path -LiteralPath (Join-Path $AppRoot "src\server.mjs") -PathType Leaf)) { throw "on-client 서버 파일이 없습니다." }
+Set-Location -LiteralPath $AppRoot
+node --version
+npm.cmd run check
+```
+
+`node`의 지원 주요 버전은 **22~24**, 권장 수업 버전은 `24.19.0`입니다. 실제 데스크톱에서 `v24.18.0`도 관찰했습니다. `npm.cmd run check`는 학생 코드 문법만 검사합니다.
+3. 같은 `on-client` PowerShell에서 공식 실행 도구를 사용합니다. 개인 Native Host 설정이 **현재 PC에 이미 있을 때만** 해당 파일 경로를 전달합니다.
+
+```powershell
+$config = Join-Path $env:LOCALAPPDATA 'KimJH-NativeHost\native.json'
+if (Test-Path -LiteralPath $config -PathType Leaf) {
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -NativeHostConfig $config
+} else {
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+}
+```
+
+`npm start`나 `npm run demo`로 정상 연결을 증명하지 않습니다. `케셰브가 켜졌습니다`는 로컬 HTTP 응답만 뜻합니다. `-NativeHostConfig`는 AI 계정 설정이고 기존 SDP 원천을 연결하는 `-SdpHostConfig`와 다릅니다. 다른 PC의 비밀 설정을 복사·공개하지 않습니다.
+4. 브라우저 `http://127.0.0.1:5189/`에서 `Ctrl+F5`로 갱신합니다. 「보호 현황」 상단의 **네트워크·Windows 방화벽·Windows 경고/오류·SDP 네 카드**와 하단 기록·조회 이력을 확인합니다. 「**다시 조회 · 관제 상태**」와 「**다시 조회 · CPU·메모리·디스크**」를 각각 눌러 **실제 값·단위·측정 시각·확인 불가 원인**을 확인합니다. `Tab`, `Enter`/`Space`로 키보드 조작도 가능합니다. `SDP 미연결`은 PC 조회 성공과 구분합니다.
+5. 종료는 실행 PowerShell에서 `Ctrl+C`, 재실행은 동일한 `on-client` 폴더에서 **3번 명령 재입력**입니다. 기존 제출물은 유지하고 포장하지 않습니다.
+
+| 문제가 나타나면 | 먼저 확인할 원인·다음 조치 |
+| --- | --- |
+| `Set-Location` 경로 없음 | 다른 PC 경로를 썼는지 확인 → 탐색기에서 실제 Git 폴더를 열고 2번 |
+| `npm error Missing script: "check"` | 현재 폴더가 저장소 최상위가 아닌 `on-client`인지 확인 → `Set-Location -LiteralPath $AppRoot` |
+| `Cannot find module ...\src\server.mjs` / `-File .\tools\start-alekov.ps1` 없음 | `Test-Path .\src\server.mjs`와 `Test-Path .\tools\start-alekov.ps1`가 `True`인지 검사 |
+| Node.js 없음 / 지원 밖 버전 | Node.js 22~24 설치 상태 확인 후 새 PowerShell 창에서 `node --version` |
+| 포트 5189 사용 중 | 다른 프로그램 강제 종료 금지. 이전 서버 정상 종료 또는 공식 실행 도구 `-Port 5190`과 주소 `http://127.0.0.1:5190/` 사용 |
+| `ENGINE_NOT_CONNECTED` / `SDP 미연결` | 실제 SDP 원천 미연결. 로컬 PC 조회 성공과 별개. 승인된 운영자 연결 `-SdpHostConfig` 확인 |
+| PC 조회 `확인 불가` | 항목별 오류·Windows 서비스 확인 후 「다시 조회」. 관리자 권한 상승·방화벽 변경 금지 |
+
+**실측·예시 구분:** 이전 학생 PC에서 확인한 CPU·메모리·디스크와 Windows 기록·네트워크 화면은 **그때의 실측**입니다. 위 명령은 설명용이며 새로운 PC의 측정 결과가 아닙니다. 제3자 실행, 설치형 앱, 실제 SDP·AI 원천 성공은 **미확인**입니다. Windows System/Application 경고·오류 건수는 공격·침해 탐지 결과가 아닙니다.
+
+---
+
 ## 1. 목적·지원 환경과 증거 수준
 
 KimJH는 사용자 본인의 로그인·기기·세션 상태, 업무 앱 접근 판정, 접속/XDR 기록, AI의 근거 설명과 조치 제안, 설치 패키지 OSV 조회 결과를 **보여 주는** 로컬 보안 Agent입니다. 접근 허용·차단, XDR 탐지, 실제 조치 집행의 권위는 기존 SDP/원천 시스템에 있습니다. AI의 제안은 집행 명령이 아닙니다.
@@ -24,10 +73,10 @@ KimJH는 사용자 본인의 로그인·기기·세션 상태, 업무 앱 접근
 
 ## 2. 실제 작업 위치와 폴더 구조
 
-학생 PC에서 실제 사용한 Git 저장소는 Windows 사용자 홈의 `OneDrive\Desktop\SKT ALEPH\choi-bujang-secret-vault`입니다. 개인정보가 들어가는 사용자 계정명 대신 `$env:USERPROFILE`로 경로를 작성합니다.
+21단계 당시 **노트북 경로는** `OneDrive\Desktop\SKT ALEPH\choi-bujang-secret-vault`였고 **데스크톱 경로는** `Desktop\SKTA-KJH\choi-bujang-secret-vault`였습니다. 다른 PC에서는 이 경로를 복사하지 말고 위 0장의 Git 최상위 자동 탐색 명령을 사용합니다.
 
 ```text
-<사용자 홈>\OneDrive\Desktop\SKT ALEPH\choi-bujang-secret-vault\  ← Git 최상위, 기존 1~12단계 보존
+<기존 Git 저장소를 둔 위치>\choi-bujang-secret-vault\  ← Git 최상위, 기존 1~12단계 보존
 ├── .git\                          ← Git 이력 (로컬)
 ├── README.md                      ← 기존 단계 설명; 학생 21단계 문서로 대체하지 않음
 ├── aleph.config.json              ← 기존 단계 설정, on-client 실행용 Native Host 설정이 아님
@@ -65,19 +114,19 @@ KimJH는 사용자 본인의 로그인·기기·세션 상태, 업무 앱 접근
 
 ### 3-1. 필수 프로그램과 위치 확인
 
-Node.js `v24.19.0`, Git, PowerShell, 로컬 브라우저를 준비합니다. 아래 명령은 **Windows PowerShell에 입력**합니다. 이미 내려받은 프로젝트를 **삭제하거나 새로 생성하지 않습니다.** 파일 탐색기에서 `on-client` 폴더 주소창에 `powershell`을 입력해 같은 위치에서 열어도 됩니다.
+Node.js 22~24(수업 권장 `v24.19.0`), Git, Windows PowerShell, 로컬 브라우저를 준비합니다. 기존 프로젝트를 **삭제하거나 새로 생성하지 않습니다**. 파일 탐색기에서 **실제 Git 폴더 또는 `on-client`**를 열고 주소창에 `powershell`을 입력합니다.
 
 ```powershell
-$ProjectRoot = Join-Path $env:USERPROFILE 'OneDrive\Desktop\SKT ALEPH\choi-bujang-secret-vault'
+$ProjectRoot = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $ProjectRoot) { throw '기존 Git 폴더에서 PowerShell을 여세요.' }
 $AppRoot = Join-Path $ProjectRoot 'on-client'
-Test-Path -LiteralPath (Join-Path $AppRoot 'tools\start-alekov.ps1')
-Test-Path -LiteralPath (Join-Path $AppRoot 'src\server.mjs')
-git -C $ProjectRoot rev-parse --show-toplevel
+if (-not (Test-Path -LiteralPath (Join-Path $AppRoot 'tools\start-alekov.ps1') -PathType Leaf)) { throw '실행 도구 없음' }
+if (-not (Test-Path -LiteralPath (Join-Path $AppRoot 'src\server.mjs') -PathType Leaf)) { throw '서버 파일 없음' }
 node --version
 Set-Location -LiteralPath $AppRoot
 ```
 
-`Test-Path`는 두 번 모두 `True`여야 합니다. `git ... --show-toplevel`이 `$ProjectRoot`가 가리키는 Git 최상위와 일치하는지 확인합니다. 명령 결과가 다르면 임의로 다른 폴더를 실행하지 말고 실제 복제 위치를 먼저 확인하세요. PowerShell 및 Git 버전 표시는 이 학생 PC에서 별도 기록하지 않았습니다.
+파일 존재 여부를 명시적으로 검사하고 없으면 오류로 중단합니다. 명령 실행 후 현재 위치가 `on-client`인지 확인하세요. Git 최상위 검색이 실패한다면 기존 Git 폴더를 다시 열어 실행합니다. PowerShell과 Git의 정확한 버전은 별도 기록하지 않았습니다.
 
 ### 3-2. 앱 코드 문법 검사 (필수 동작과 분리)
 
@@ -101,11 +150,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 
 ```powershell
 $NativeConfig = Join-Path $env:LOCALAPPDATA 'KimJH-NativeHost\native.json'
-Test-Path -LiteralPath $NativeConfig
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -NativeHostConfig $NativeConfig
+if (Test-Path -LiteralPath $NativeConfig -PathType Leaf) {
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -NativeHostConfig $NativeConfig
+} else {
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+}
 ```
 
-`Test-Path`가 `True`이고 스크립트가 검증을 통과할 때만 실행됩니다. 학생 PC에서는 이 옵션을 포함한 실행으로 웹 화면과 계정 승인 흐름까지 확인했습니다. `-NativeHostConfig`는 `-SdpHostConfig`를 대신하지 않습니다. 실무 판정·XDR·원천 조치를 실사용으로 검증한 것은 아닙니다.
+개인 Native Host 설정 파일이 실제로 있을 때만 `-NativeHostConfig` 옵션으로 실행합니다. 파일이 없다면 **기본 실행으로 전환**하고, AI 인증·SDP 연결 성공은 주장하지 않습니다. 과거 노트북에서 옵션을 포함한 실행으로 웹 화면과 계정 승인 흐름까지 확인했습니다. `-NativeHostConfig`는 `-SdpHostConfig`를 대신하지 않습니다. 실무 판정·XDR·원천 조치를 실사용으로 검증한 것은 아닙니다.
 
 ### 3-5. 시작 신호, 브라우저, 종료와 재실행
 
@@ -270,14 +322,17 @@ flowchart LR
 **기존 폴더 실행·확인:** 원래 `on-client`의 PowerShell에서 실행 중인 서버가 있다면 그 창의 `Ctrl+C`로 종료합니다.
 
 ```powershell
-Set-Location -LiteralPath "C:\Users\wnsgh\OneDrive\Desktop\SKT ALEPH\choi-bujang-secret-vault\on-client"
+$ProjectRoot = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $ProjectRoot) { throw '기존 Git 폴더에서 PowerShell을 여세요.' }
+$AppRoot = Join-Path $ProjectRoot 'on-client'
+Set-Location -LiteralPath $AppRoot
 npm.cmd run check
 node --check .\src\pc-status.mjs
 node --check .\public\pc-status.mjs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -NativeHostConfig "$env:LOCALAPPDATA\KimJH-NativeHost\native.json"
 ```
 
-기존 개인 Native Host 파일이 있는 경우에만 이 옵션을 사용합니다. 일반 실행은 `.\tools\start-alekov.ps1`이고, SDP 연결은 별도 운영자 설정이 필요합니다. `http://127.0.0.1:5189/`에서 강력 새로고침 후 「보호 현황」의 「내 PC 상태」 버튼을 두 번 눌러 측정값·시각·단위 및 비교를 확인합니다. 값을 읽을 수 없으면 `확인 불가`와 이유가 표시되는지 확인합니다.
+기존 개인 Native Host 파일이 있는 경우에만 이 옵션을 사용합니다. 일반 실행은 `.\tools\start-alekov.ps1`이고, SDP 연결은 별도 운영자 설정이 필요합니다. `http://127.0.0.1:5189/`에서 강력 새로고침 후 「보호 현황」의 「내 PC 상태」의 「다시 조회 · CPU·메모리·디스크」 버튼을 두 번 눌러 측정값·시각·단위 및 비교를 확인합니다. 값을 읽을 수 없으면 `확인 불가`와 이유가 표시되는지 확인합니다.
 
 **증거 구분:** 별도 Linux/Node 환경에서 기본 측정 호출과 모의 정상·실패 데이터를 검증했지만, 그 값은 사용자 PC 실측이 아닙니다. **Windows PC에서 이 새 기능이 실제로 동작했는지, CPU·메모리·디스크의 실제 수치와 시각은 아직 미확인**입니다.
 
@@ -311,7 +366,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Na
 현재 확인된 **실제 PC 프로젝트 경로**는 아래와 같습니다. 기존 프로젝트나 별도 보안 설정 파일을 옮기지 않습니다.
 
 ```powershell
-Set-Location -LiteralPath "C:\Users\Administrator\Desktop\SKTA-KJH\choi-bujang-secret-vault\on-client"
+$ProjectRoot = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $ProjectRoot) { throw '기존 Git 폴더에서 PowerShell을 여세요.' }
+$AppRoot = Join-Path $ProjectRoot 'on-client'
+Set-Location -LiteralPath $AppRoot
 git pull --ff-only origin main
 npm.cmd run check
 node --check .\src\server.mjs
@@ -323,7 +381,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 
 다른 PowerShell 창에서 기존 앱이 실행 중이면 먼저 그 창에서 `Ctrl+C`로 종료합니다. 개인 Native Host 구성이 이 PC에 이미 **존재할 때만** 기존 명령의 `-NativeHostConfig`를 별도로 추가하며 인증 파일을 다른 PC에서 복사하지 않습니다.
 
-브라우저 `http://127.0.0.1:5189/`에서 강력 새로고침 → 「보호 현황」 맨 위 「KimJH 관제 대시보드」 → 「지금 상태 조회」를 누릅니다. 카드 4개와 각 조회 시각, 네트워크·방화벽·Windows 집계, SDP가 서로 구분돼 보이는지 확인합니다. 버튼을 다시 눌러 아래 이력 표에 조회별 결과가 추가되는지 확인합니다. 사용자가 PC의 민감 정보가 보이는 전체 캡처를 공유할 필요는 없습니다.
+브라우저 `http://127.0.0.1:5189/`에서 강력 새로고침 → 「보호 현황」 맨 위 「KimJH 관제 대시보드」 → 「다시 조회 · 관제 상태」를 누릅니다. 카드 4개와 각 조회 시각, 네트워크·방화벽·Windows 집계, SDP가 서로 구분돼 보이는지 확인합니다. 버튼을 다시 눌러 아래 이력 표에 조회별 결과가 추가되는지 확인합니다. 사용자가 PC의 민감 정보가 보이는 전체 캡처를 공유할 필요는 없습니다.
 
 **재현 증거 수준:** GitHub 원문과 Node.js 모의 데이터를 사용한 계약 검사는 실제 Windows PC 정보 조회가 아닙니다. 사용자가 데스크톱에서 직접 클릭하기 전에는 실제 네트워크 주소, 방화벽 설정, 이벤트 건수, 현재 SDP 연결 상태가 **모두 미확인**입니다. 이후 사용자가 공유한 확인 결과만 측정값으로 기록합니다. 기존 22단계 제출 SHA는 보존하며 별도 새 소스 커밋은 과거 제출을 소급 변경하지 않습니다.
 
@@ -346,7 +404,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 기존 서버가 동작 중이면 해당 PowerShell 창에서 `Ctrl+C`로 종료한 뒤, 데스크톱 프로젝트의 `on-client` 폴더에서 아래를 실행합니다.
 
 ```powershell
-Set-Location -LiteralPath "C:\Users\Administrator\Desktop\SKTA-KJH\choi-bujang-secret-vault\on-client"
+$ProjectRoot = git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $ProjectRoot) { throw '기존 Git 폴더에서 PowerShell을 여세요.' }
+$AppRoot = Join-Path $ProjectRoot 'on-client'
+Set-Location -LiteralPath $AppRoot
 git pull --ff-only origin main
 npm.cmd run check
 node --check .\public\pc-status.mjs
