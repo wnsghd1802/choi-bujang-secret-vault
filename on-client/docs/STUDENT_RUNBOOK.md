@@ -280,3 +280,49 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Na
 기존 개인 Native Host 파일이 있는 경우에만 이 옵션을 사용합니다. 일반 실행은 `.\tools\start-alekov.ps1`이고, SDP 연결은 별도 운영자 설정이 필요합니다. `http://127.0.0.1:5189/`에서 강력 새로고침 후 「보호 현황」의 「내 PC 상태」 버튼을 두 번 눌러 측정값·시각·단위 및 비교를 확인합니다. 값을 읽을 수 없으면 `확인 불가`와 이유가 표시되는지 확인합니다.
 
 **증거 구분:** 별도 Linux/Node 환경에서 기본 측정 호출과 모의 정상·실패 데이터를 검증했지만, 그 값은 사용자 PC 실측이 아닙니다. **Windows PC에서 이 새 기능이 실제로 동작했는지, CPU·메모리·디스크의 실제 수치와 시각은 아직 미확인**입니다.
+
+
+## 11. 총공세 3일차 — 관제 대시보드 (연결·기록)
+
+**형태:** 상단 상태 카드 **네 개**(네트워크 / Windows 방화벽 / 최근 Windows 경고·오류 / SDP 연결), 아래 실제 조회 내용과 최근 **최대 6회 조회별 건수 추이**. 기존 「보호 현황」의 SDP 기능과 2일차 CPU·메모리·디스크 실측을 그대로 유지합니다. **포장하지 않고 원래 프로젝트 폴더에서 실행**합니다. 설치 프로그램·패키징 명령은 수행하지 않습니다.
+
+### 제공 기능과 학생 추가 기능
+
+| 구분 | 파일 | 역할 |
+| --- | --- | --- |
+| 기존 제공, 유지 | `src/engine.mjs`·`src/server.mjs`의 기존 `/api/me`·`/api/events`·`/api/diagnostics` | 제공 SDP 기록·연결 조회. 현재 사용자 PC의 System/Application 기록과 별개 |
+| 기존 학생 작업, 유지 | `student/extension.mjs`·`public/app.js`·`src/pc-status.mjs` | 13~22단계 보안 Agent 표시와 2일차 실제 CPU·메모리·디스크 |
+| 신규 | `tools/read-windows-observation.ps1` | Windows 일반 사용자 권한으로 `Get-NetIPConfiguration`·`Get-NetFirewallProfile`·`Get-WinEvent`를 **읽기만** 수행. 오류 원문, MAC/SID, 개인 기록 본문, 토큰 출력 없음. 권한 상승·설정 변경·공격 시험 없음 |
+| 신규 | `src/windows-observation.mjs` | Node.js가 절대 경로가 아닌 모듈 상대 위치의 읽기 전용 스크립트를 `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`로 실행. 실행 시간·응답 크기 제한, 결과 형식·상태 검사, 예외 문자열 비노출 |
+| 작은 변경 | `src/server.mjs` | 기존 로컬 HTTP Host·Origin 검사 안에 `GET /api/windows-observation` 추가. SDP 연결과 별개로 PC만 관측 |
+| 화면 추가 | `public/index.html`·`public/windows-dashboard.mjs`·`public/style.css` | 네 카드·상세·이력, 측정 시각·확인 불가 원인·별도 SDP 상태 표시. `createElement`와 `textContent` 사용 |
+| 검사 추가 | `test/windows-observation.test.mjs` | 정상·부분 실패·권한 부족·잘못된 결과·조회 상한·Windows 이외 환경을 Node.js 모의 입력으로 검사 |
+
+### 실측 의미·판단 한계
+
+- **네트워크:** 현재 PC에서 확인된 IPv4 어댑터·로컬 IPv4·기본 게이트웨이를 표시합니다. 네트워크 정보를 읽을 수 있다는 것이 **외부 접속이나 SDP 연결 성공은 아닙니다**.
+- **방화벽:** Domain(도메인)·Private(개인)·Public(공용)의 활성 여부, 기본 인바운드·아웃바운드 설정만 **읽습니다**. 설정 변경·방화벽 예외 추가·관리자 권한 상승을 하지 않습니다. 읽기 불가면 `확인 불가` 및 이유가 나옵니다. 프로필이 켜졌어도 PC가 안전하다는 판정은 하지 않습니다.
+- **Windows 기록:** 현재 조회 시각 기준 **최근 24시간**의 `System`·`Application` 중 `Level=2(Error)`와 `Level=3(Warning)` 집계만 표시합니다. 개인정보가 담길 수 있는 이벤트 원문·사용자 정보는 표시·저장하지 않습니다. 각 로그마다 권한 부족·서비스 오류는 `확인 불가`로 둡니다. 조회가 **5,000건 상한**을 넘으면 `최소 n건`으로 표시하므로 전체 건수로 단정하지 않습니다. **이 집계는 침해·공격·악성코드 탐지 건수가 아닙니다.**
+- **SDP:** 같은 화면에서 제공 진단 API `/api/diagnostics`를 **독립 조회**합니다. `disconnected`이면 `SDP 미연결`, `demo`이면 `예제(demo) · 실제 SDP 미연결`, `connected`이면 `SDP 어댑터 구성됨 · 실데이터 조회 성공 미확인`으로 표시합니다. 네트워크·방화벽·이벤트 조회 성공을 SDP 접속 성공으로 바꾸지 않습니다.
+- **시간·추이:** 항목마다 실제 조회 시각을 표시합니다. 최근 6회 조회별 사건 수를 현재 브라우저에만 보관하며, 새로고침하면 지웁니다. 값이 없거나 API 오류면 0으로 대체하거나 임의 예시를 채우지 않습니다.
+
+### 데스크톱 PC에서 재현
+
+현재 확인된 **실제 PC 프로젝트 경로**는 아래와 같습니다. 기존 프로젝트나 별도 보안 설정 파일을 옮기지 않습니다.
+
+```powershell
+Set-Location -LiteralPath "C:\Users\Administrator\Desktop\SKTA-KJH\choi-bujang-secret-vault\on-client"
+git pull --ff-only origin main
+npm.cmd run check
+node --check .\src\server.mjs
+node --check .\src\windows-observation.mjs
+node --check .\public\windows-dashboard.mjs
+node --test .\test\windows-observation.test.mjs
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
+```
+
+다른 PowerShell 창에서 기존 앱이 실행 중이면 먼저 그 창에서 `Ctrl+C`로 종료합니다. 개인 Native Host 구성이 이 PC에 이미 **존재할 때만** 기존 명령의 `-NativeHostConfig`를 별도로 추가하며 인증 파일을 다른 PC에서 복사하지 않습니다.
+
+브라우저 `http://127.0.0.1:5189/`에서 강력 새로고침 → 「보호 현황」 맨 위 「KimJH 관제 대시보드」 → 「지금 상태 조회」를 누릅니다. 카드 4개와 각 조회 시각, 네트워크·방화벽·Windows 집계, SDP가 서로 구분돼 보이는지 확인합니다. 버튼을 다시 눌러 아래 이력 표에 조회별 결과가 추가되는지 확인합니다. 사용자가 PC의 민감 정보가 보이는 전체 캡처를 공유할 필요는 없습니다.
+
+**재현 증거 수준:** GitHub 원문과 Node.js 모의 데이터를 사용한 계약 검사는 실제 Windows PC 정보 조회가 아닙니다. 사용자가 데스크톱에서 직접 클릭하기 전에는 실제 네트워크 주소, 방화벽 설정, 이벤트 건수, 현재 SDP 연결 상태가 **모두 미확인**입니다. 이후 사용자가 공유한 확인 결과만 측정값으로 기록합니다. 기존 22단계 제출 SHA는 보존하며 별도 새 소스 커밋은 과거 제출을 소급 변경하지 않습니다.
