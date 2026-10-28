@@ -223,15 +223,15 @@ flowchart LR
 
 | 핵심 기능 | 학생 화면에서 실제 본 것 | 현재 코드의 연결 경계와 다음 확인 |
 | --- | --- | --- |
-| 로그인·기기·업무 앱 접근 | 기존 PC 화면에서 §renderIdentity§ 오류 표시, §renderDecision§의 판정 요청 전 상태, 제공 UI의 기존 서버 연결 실패를 관찰함. **실제 허용·거부 판정은 미확인** | §src/server.mjs§는 §-SdpHostConfig§가 없는 기본 모드에서 SDP 연결이 되지 않습니다. §student/engine-adapter.mjs§는 검증된 호스트 capability만 전달하므로 임의 데이터를 만들지 않습니다. 운영자가 승인한 SDP 원천, 사용자 범위, 개인 자격 설정이 있어야 합니다 |
-| 본인 접속·XDR 기록 | §renderEvents§의 「연결 없음」·기록 조회 실패를 확인함. 실제 사건·필터·근거 상세의 새 실측은 없음 | §src/engine/sdp-host.mjs§에는 §readEvents§·§readDevices§·§readSessions§ 구현이 있으나 **원천 연결 성공 및 실제 XDR 데이터는 미확인**. 제공 API가 실데이터를 반환할 때만 목록·필터·상세를 평가합니다 |
-| 정확한 설치 버전·OSV | 기존 PC 화면에서 **§PROJECT_NOT_CONFIGURED§**, §not_configured§, 조회 시각 §2026-10-27T07:20:16.207Z§(한국시간 16:20:16)를 관찰함. OSV로 전송한 패키지나 취약점 ID는 없음 | §src/vulnerabilities/project-scan.mjs§는 운영자 승인 §ON_PROJECT_DIRECTORY§와 §ON_APPROVED_PUBLIC_PACKAGES§ 및 해당 프로젝트의 §package-lock.json§·설치 메타데이터를 검사합니다. §on-client§ 내부에 lockfile이 없고 지정된 프로젝트가 없는 현재 상태에서 ‘취약점 없음’을 주장할 수 없습니다 |
+| 로그인·기기·업무 앱 접근 | 기존 PC 화면에서 `renderIdentity` 오류 표시, `renderDecision`의 판정 요청 전 상태, 제공 UI의 기존 서버 연결 실패를 관찰함. **실제 허용·거부 판정은 미확인** | `src/server.mjs`는 `-SdpHostConfig`가 없는 기본 모드에서 SDP 연결이 되지 않습니다. `student/engine-adapter.mjs`는 검증된 호스트 capability만 전달하므로 임의 데이터를 만들지 않습니다. 운영자가 승인한 SDP 원천, 사용자 범위, 개인 자격 설정이 있어야 합니다 |
+| 본인 접속·XDR 기록 | `renderEvents`의 「연결 없음」·기록 조회 실패를 확인함. 실제 사건·필터·근거 상세의 새 실측은 없음 | `src/engine/sdp-host.mjs`에는 `readEvents`·`readDevices`·`readSessions` 구현이 있으나 **원천 연결 성공 및 실제 XDR 데이터는 미확인**. 제공 API가 실데이터를 반환할 때만 목록·필터·상세를 평가합니다 |
+| 정확한 설치 버전·OSV | 기존 PC 화면에서 **`PROJECT_NOT_CONFIGURED`**, `not_configured`, 조회 시각 `2026-10-27T07:20:16.207Z`(한국시간 16:20:16)를 관찰함. OSV로 전송한 패키지나 취약점 ID는 없음 | `src/vulnerabilities/project-scan.mjs`는 운영자 승인 `ON_PROJECT_DIRECTORY`와 `ON_APPROVED_PUBLIC_PACKAGES` 및 해당 프로젝트의 `package-lock.json`·설치 메타데이터를 검사합니다. `on-client` 내부에 lockfile이 없고 지정된 프로젝트가 없는 현재 상태에서 ‘취약점 없음’을 주장할 수 없습니다 |
 
-**설정 경계:** §-NativeHostConfig§는 ALEPH 계정/AI 연결 설정이고 §-SdpHostConfig§는 별도의 기존 SDP 엔진 설정입니다. 전자를 사용했다고 후자의 연결이 완료되는 것은 아닙니다. 비밀 키·인증서·토큰·개인 설정 파일은 프로젝트와 Git 밖에서 운영자가 관리하며, 이 설명서에는 어떤 비밀값도 적지 않습니다. 학생 표시 코드는 API 상태를 출력할 뿐 운영자의 승인 목록을 추가하거나 권한 검사를 우회하지 않습니다.
+**설정 경계:** `-NativeHostConfig`는 ALEPH 계정/AI 연결 설정이고 `-SdpHostConfig`는 별도의 기존 SDP 엔진 설정입니다. 전자를 사용했다고 후자의 연결이 완료되는 것은 아닙니다. 비밀 키·인증서·토큰·개인 설정 파일은 프로젝트와 Git 밖에서 운영자가 관리하며, 이 설명서에는 어떤 비밀값도 적지 않습니다. 학생 표시 코드는 API 상태를 출력할 뿐 운영자의 승인 목록을 추가하거나 권한 검사를 우회하지 않습니다.
 
-**이번 UI 개선 범위:** §student/extension.mjs§의 §renderIdentity§·§renderDecision§·§renderEvents§·§renderVulnerabilities§에서 미연결/미설정 원인과 수동 확인 동선을 더 분명히 표시합니다. 제공 서버·§public/app.js§·§student/engine-adapter.mjs§·판정·인증 설정은 변경하지 않았습니다. 기존 §allow§/§deny§/§challenge§/§unknown§, §not_configured§·§not_checked§·§unverifiable§ 등 상태 코드의 의미도 변경하지 않았습니다.
+**이번 UI 개선 범위:** `student/extension.mjs`의 `renderIdentity`·`renderDecision`·`renderEvents`·`renderVulnerabilities`에서 미연결/미설정 원인과 수동 확인 동선을 더 분명히 표시합니다. 제공 서버·`public/app.js`·`student/engine-adapter.mjs`·판정·인증 설정은 변경하지 않았습니다. 기존 `allow`/`deny`/`challenge`/`unknown`, `not_configured`·`not_checked`·`unverifiable` 등 상태 코드의 의미도 변경하지 않았습니다.
 
-**실행 결과와 설명용 값 구분:** §2026-10-27T07:20:16.207Z§는 위 사용자 화면에서 실제 관찰한 값이며 **현재 앱을 재실행해 측정한 새 값은 아닙니다.** §allow§·§deny§·§challenge§ 및 §known_vulnerabilities§는 코드가 처리하는 **가능한 상태값의 예**이며 현재 실제 조회 결과가 아닙니다. 개선된 새 문구와 로컬 문법 검사의 결과도 학생 PC에서 새로 실행해 확인하기 전까지 **미확인**입니다.
+**실행 결과와 설명용 값 구분:** `2026-10-27T07:20:16.207Z`는 위 사용자 화면에서 실제 관찰한 값이며 **현재 앱을 재실행해 측정한 새 값은 아닙니다.** `allow`·`deny`·`challenge` 및 `known_vulnerabilities`는 코드가 처리하는 **가능한 상태값의 예**이며 현재 실제 조회 결과가 아닙니다. 개선된 새 문구와 로컬 문법 검사의 결과도 학생 PC에서 새로 실행해 확인하기 전까지 **미확인**입니다.
 
 
 ## 8. 직접 재현할 확인 순서 (문서 작성 이후)
@@ -251,3 +251,32 @@ flowchart LR
 비공개 저장소에서 원문 전달을 요구하는 경우에 한해서, **ALEPH 21단계 화면**의 「비공개 저장소 원문 준비 방법」에서 「원문 전달 도구 받기」를 사용합니다. ZIP과 출력 JSON은 프로젝트 바깥 폴더에 보관하며, `student-source-cli.mjs`의 정확한 명령·실제 도구 경로·`--commit` 인자는 과제 화면의 안내와 제출 SHA를 확인한 뒤 사용합니다. **이 문서에는 임의의 도구 경로·명령을 만들지 않습니다.** 도구는 커밋된 원문만 묶으며 학생 코드를 실행하지 않습니다. 원문 전달과 AI 검토 통과는 별도로 확인하고, 원문 전달만 실패한 경우 ALEPH 화면의 「원문만 다시 보내기」를 사용합니다.
 
 키·토큰·비밀번호·Native Host 설정 원문·`node_modules`·개인 `.env`는 커밋에 넣지 않습니다. 21단계 문서가 실제 실행·운영 연결이나 공식 통과를 대신하지 않습니다.
+
+## 10. 총공세 2일차 — 내 PC 상태 실측과 직전 측정 비교
+
+현재 제공된 「내 기기」는 SDP 기기 보안 상태 조회이며 CPU·메모리·디스크 사용량 측정이 아닙니다. **기존 제공 기능을 중복 구현하지 않고 별도 학생 카드** 「보호 현황 → 내 PC 상태」를 추가했습니다.
+
+| 파일 | 변경 내용 |
+| --- | --- |
+| `src/pc-status.mjs` (신규) | `node:os` CPU tick·물리 메모리, `node:fs/promises` statfs로 앱이 실행된 로컬 PC 실측. 관리자 권한·외부 프로그램 불필요 |
+| `src/server.mjs` | 기존 루프백·Host 검사 및 비밀 보호를 유지하며 GET `/api/pc-status` 추가 |
+| `public/index.html`·`public/pc-status.mjs` | 학생 추가 카드와 측정 버튼; 수치·단위·개별 시각·오류 사유·직전 값 비교 표시. textContent 사용 |
+| 보존 | `student/extension.mjs`, `public/app.js`, `student/engine-adapter.mjs`, 기존 SDP/AI/조치·제출 코드는 수정하지 않음 |
+
+**측정값 의미:** CPU 사용률(%)은 약 650 ms 동안 `os.cpus()`의 전체 논리 프로세서 누적 바쁜 시간 비율입니다. 메모리 사용량(GiB)은 `os.totalmem() - os.freemem()`, 디스크 남은 공간(GiB)은 앱 설치 볼륨의 `statfs.bavail × statfs.bsize`입니다. 메모리·디스크 전체 용량도 표시합니다. 작업 관리자와 통계 정의가 달라 수치가 다를 수 있습니다. `measuredAt`은 각 자원 측정의 UTC ISO 시각이며 화면에서는 로컬 시간으로 표시됩니다.
+
+**선택한 추가 기능은 직전 측정 비교입니다.** 최초 클릭 시 비교할 실제 값 없음, 두 번째 클릭부터 같은 브라우저 페이지의 직전 실제값 대비 증감·이전 시각을 표시합니다. CPU 차이는 두 사용률 간의 차이(퍼센트포인트), 메모리·디스크 차이는 GiB입니다. 새로고침 시 이전 측정은 유지되지 않습니다. 측정 실패·응답 형식 오류·요청 실패 시 `확인 불가`와 읽지 못한 이유를 표시하고, 0·예제값·과거 측정값으로 채우지 않습니다. 요청은 버튼으로만 시작하며 자동 재시도·영구 저장하지 않습니다. 개인정보·사용자 폴더 경로·토큰은 응답에 넣지 않습니다.
+
+**기존 폴더 실행·확인:** 원래 `on-client`의 PowerShell에서 실행 중인 서버가 있다면 그 창의 `Ctrl+C`로 종료합니다.
+
+```powershell
+Set-Location -LiteralPath "C:\Users\wnsgh\OneDrive\Desktop\SKT ALEPH\choi-bujang-secret-vault\on-client"
+npm.cmd run check
+node --check .\src\pc-status.mjs
+node --check .\public\pc-status.mjs
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -NativeHostConfig "$env:LOCALAPPDATA\KimJH-NativeHost\native.json"
+```
+
+기존 개인 Native Host 파일이 있는 경우에만 이 옵션을 사용합니다. 일반 실행은 `.\tools\start-alekov.ps1`이고, SDP 연결은 별도 운영자 설정이 필요합니다. `http://127.0.0.1:5189/`에서 강력 새로고침 후 「보호 현황」의 「내 PC 상태」 버튼을 두 번 눌러 측정값·시각·단위 및 비교를 확인합니다. 값을 읽을 수 없으면 `확인 불가`와 이유가 표시되는지 확인합니다.
+
+**증거 구분:** 별도 Linux/Node 환경에서 기본 측정 호출과 모의 정상·실패 데이터를 검증했지만, 그 값은 사용자 PC 실측이 아닙니다. **Windows PC에서 이 새 기능이 실제로 동작했는지, CPU·메모리·디스크의 실제 수치와 시각은 아직 미확인**입니다.

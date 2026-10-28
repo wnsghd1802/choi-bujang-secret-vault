@@ -8,6 +8,7 @@
   <title>케셰브 · ZTNA &amp; XDR</title>
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
+  <script type="module" src="/pc-status.mjs"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문으로 건너뛰기</a>
@@ -76,6 +77,35 @@
         <section class="card student" aria-labelledby="student-status-title">
           <h2 id="student-status-title">학생 상태·알림 표시 <span class="tag tag-student">student/extension.mjs · renderStatus</span></h2>
           <div id="student-status" class="student-slot" aria-live="polite"></div>
+        </section>
+
+        <!-- 학생 추가: PC 실측. 제공 SDP '내 기기'와 구분 -->
+        <section class="card student" id="pc-status-section" aria-labelledby="pc-status-title">
+          <h2 id="pc-status-title">내 PC 상태 <span class="tag tag-student">KimJH 추가 · 2일차</span></h2>
+          <p class="muted">일반 사용자 권한으로 이 PC의 자원을 읽습니다. 제공 SDP 기기 조회·예제(demo) 데이터가 아닙니다.</p>
+          <div class="row"><button type="button" class="btn" id="pc-status-measure">지금 측정 · 직전 값과 비교</button></div>
+          <p id="pc-status-message" role="status" aria-live="polite">측정 전 · 예시 수치를 실제값으로 표시하지 않습니다.</p>
+          <div class="grid-2" id="pc-status-results">
+            <section class="card" aria-labelledby="pc-status-cpu-title">
+              <h3 id="pc-status-cpu-title">CPU 사용률 (%)</h3>
+              <p id="pc-status-cpu-value">확인 전 · 측정하지 않았습니다.</p>
+              <p id="pc-status-cpu-time" class="muted">측정 시각: 없음</p>
+              <p id="pc-status-cpu-compare" class="muted">직전 측정 비교: 없음</p>
+            </section>
+            <section class="card" aria-labelledby="pc-status-memory-title">
+              <h3 id="pc-status-memory-title">물리 메모리 사용량 (GiB)</h3>
+              <p id="pc-status-memory-value">확인 전 · 측정하지 않았습니다.</p>
+              <p id="pc-status-memory-time" class="muted">측정 시각: 없음</p>
+              <p id="pc-status-memory-compare" class="muted">직전 측정 비교: 없음</p>
+            </section>
+            <section class="card" aria-labelledby="pc-status-disk-title">
+              <h3 id="pc-status-disk-title">앱 설치 볼륨 남은 공간 (GiB)</h3>
+              <p id="pc-status-disk-value">확인 전 · 측정하지 않았습니다.</p>
+              <p id="pc-status-disk-time" class="muted">측정 시각: 없음</p>
+              <p id="pc-status-disk-compare" class="muted">직전 측정 비교: 없음</p>
+            </section>
+          </div>
+          <p class="muted">CPU는 650 ms 구간 평균입니다. 각 값의 단위와 측정 시각을 표시하며 실패한 측정은 확인 불가로 둡니다. 이전 비교값은 이 브라우저 화면 안에서만 보관합니다.</p>
         </section>
 
         <section class="card provided" aria-labelledby="diag-title">
