@@ -64,7 +64,8 @@ function paint(data) {
       continue;
     }
     const delta = metric.value - old.value;
-    const change = Math.abs(delta) < 0.05 ? '변화 없음' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)} ${metric.unit}`;
+    const deltaUnit = key === 'cpu' ? 'pp (퍼센트포인트)' : metric.unit;
+    const change = Math.abs(delta) < 0.05 ? '변화 없음' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)} ${deltaUnit}`;
     metricNode(key, 'compare').textContent = `직전 측정 대비: ${change} · 이전 ${fmtTime(old.measuredAt)}`;
   }
   previous = current;
